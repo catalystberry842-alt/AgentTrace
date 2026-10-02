@@ -16,4 +16,6 @@ export const deployment = {
   proofDeployTx: null as `0x${string}` | null,
   /** AgentTrace Demo Protocol. Null until a confirmed testnet deployment exists. */
   demoProtocol: null as `0x${string}` | null,
+  demoProtocolDeployBlock: null as number | null,
+  demoProtocolDeployTx: null as `0x${string}` | null,
 };

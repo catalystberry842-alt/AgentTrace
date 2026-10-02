@@ -3,6 +3,9 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "overrides": {
     "nf3": "0.3.17"
   },
@@ -10,13 +13,16 @@
     "dev": "node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
     "build": "node scripts/with-app-env.mjs vite build && node scripts/copy-pglite-assets.mjs && npm run db:migrate",
     "db:migrate": "node scripts/migrate.mjs",
+    "deploy:testnet": "node scripts/deploy-contracts.mjs",
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
     "preview": "node scripts/with-app-env.mjs vite preview",
     "preview:restart": "node scripts/preview.mjs restart",
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts",
+    "test": "node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts && node scripts/test-log-scan.mjs",
+    "test:contracts": "node scripts/test-registry.mjs && node scripts/test-firewall.mjs && node scripts/test-proof.mjs && node scripts/test-demo.mjs && node scripts/test-developer.mjs && node scripts/test-reputation.mjs",
+    "test:workspace": "node --test 'scripts/**/*.test.mjs'",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
