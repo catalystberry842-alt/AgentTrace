@@ -231,6 +231,48 @@ export async function verifyOutcome(executionId: string, body: unknown): Promise
   });
 }
 
+/**
+ * Decode the matched log. A canonical signature such as `Deposited(uint256,uint256)` carries no
+ * parameter names or `indexed` flags, so the Demo Protocol is decoded with its compiled ABI (named,
+ * with the real indexed layout). Other targets try each indexed layout that fits the topic count and
+ * name parameters `arg0`, `arg1`, … in signature order.
+ */
+function decodeExpectedLog(
+  target: string,
+  expectation: Extract<Expectation, { type: "EVENT_EMITTED" }>,
+  log: { data: Hex; topics: Hex[] },
+): Record<string, unknown> {
+  const topics = log.topics as [Hex, ...Hex[]];
+  const demo = configuredDemoProtocol();
+  if (demo && target.toLowerCase() === demo) {
+    const item = demoProtocolAbi.find((entry) => entry.type === "event" && entry.name === expectation.event);
+    if (item) return decodeEventLog({ abi: [item], data: log.data, topics }).args as Record<string, unknown>;
+  }
+  const types = expectation.eventSignature.slice(expectation.eventSignature.indexOf("(") + 1, -1).split(",");
+  const indexedCount = topics.length - 1;
+  if (indexedCount < 0 || indexedCount > Math.min(3, types.length)) throw new Error("Topic count does not fit the signature.");
+  const layouts: boolean[][] = [];
+  const walk = (i: number, left: number, acc: boolean[]) => {
+    if (i === types.length) {
+      if (left === 0) layouts.push(acc);
+      return;
+    }
+    if (left > 0) walk(i + 1, left - 1, [...acc, true]);
+    walk(i + 1, left, [...acc, false]);
+  };
+  walk(0, indexedCount, []);
+  for (const layout of layouts) {
+    const params = types.map((type, i) => `${type}${layout[i] ? " indexed" : ""} arg${i}`).join(", ");
+    try {
+      const abi = [parseAbiItem(`event ${expectation.event}(${params})`)];
+      return decodeEventLog({ abi, data: log.data, topics }).args as Record<string, unknown>;
+    } catch {
+      // try the next indexed layout
+    }
+  }
+  throw new Error("No indexed layout decodes this log.");
+}
+
 async function judge(
   action: ActionRow,
   expectation: Expectation,
@@ -251,12 +293,9 @@ async function judge(
         reason: "The expected event was not emitted by the execution target.",
       };
     }
-    const abi = [parseAbiItem(`event ${expectation.eventSignature}`)];
     let decoded: Record<string, unknown> = {};
     try {
-      const log = logs[0];
-      const parsed = decodeEventLog({ abi, data: log.data, topics: log.topics });
-      decoded = parsed.args as Record<string, unknown>;
+      decoded = decodeExpectedLog(action.target, expectation, logs[0]);
     } catch {
       return {
         status: "unverifiable",

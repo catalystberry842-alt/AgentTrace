@@ -1,4 +1,4 @@
-import { BaseError, createPublicClient, encodeFunctionData, fallback, http } from "viem";
+import { BaseError, createPublicClient, custom, decodeErrorResult, encodeFunctionData } from "viem";
 import { defineChain } from "viem";
 import { agentFirewallAbi, agentRegistryAbi } from "@/lib/chain/abi";
 import { MONAD_TESTNET } from "@/lib/chain/network";
@@ -136,8 +136,30 @@ const monadChain = defineChain({
   rpcUrls: { default: { http: [MONAD_TESTNET.rpcUrl] } },
 });
 
+/** Find revert data anywhere in a viem error chain and name the firewall's custom error. */
+function firewallErrorName(err: BaseError): string | null {
+  const hexOf = (value: unknown): `0x${string}` | null => {
+    if (typeof value === "string" && /^0x[0-9a-fA-F]{8,}$/.test(value)) return value as `0x${string}`;
+    if (value && typeof value === "object" && "data" in value) return hexOf((value as { data: unknown }).data);
+    return null;
+  };
+  let data: `0x${string}` | null = null;
+  err.walk((inner) => {
+    data ??= hexOf((inner as { data?: unknown }).data);
+    return false;
+  });
+  if (!data) return null;
+  try {
+    return decodeErrorResult({ abi: agentFirewallAbi, data }).errorName;
+  } catch {
+    return null;
+  }
+}
+
 function chainRevert(err: unknown): Error {
   if (err instanceof BaseError) {
+    const name = firewallErrorName(err);
+    if (name) return new Error(name);
     const reason = err.shortMessage.replace(/^Execution reverted:?\s*/i, "").trim();
     return new Error(reason || "The contract rejected this action.");
   }
@@ -168,12 +190,9 @@ export async function sendFirewallTransaction(input: {
     functionName: input.functionName,
     args: input.args as never,
   });
-  const client = createPublicClient({
-    chain: monadChain,
-    transport: fallback(
-      [MONAD_TESTNET.rpcUrl, ...MONAD_TESTNET.fallbackRpcUrls].map((url) => http(url, { timeout: 8_000 })),
-    ),
-  });
+  // Simulate through the wallet's own provider: it is already switched to Monad testnet, so the
+  // check runs on the same chain and node the transaction will be sent to.
+  const client = createPublicClient({ chain: monadChain, transport: custom(provider()) });
   try {
     await client.call({
       account: await signer.getAddress(),
