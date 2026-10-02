@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { TxStatus } from "@/components/tx-status";
 import { CAPABILITIES, type Capability, type IntentStatus } from "@/lib/agents/types";
@@ -9,6 +9,7 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Shell } from "@/components/shell";
 import { Button, ConfirmDialog, ErrorNote, Field, SkeletonLines, TextArea, TextInput, buttonClass } from "@/components/ui";
 import { formatAgentLabel } from "@/lib/format";
+import { refreshOrResubmit } from "@/lib/agents/resilient";
 
 export const Route = createFileRoute("/agents/new")({ component: NewAgentPage });
 
@@ -51,12 +52,17 @@ function CreateFlow() {
   const [phase, setPhase] = useState<Phase>(null);
   const [record, setRecord] = useState<RecordState | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const lastSubmit = useRef<Parameters<typeof submitRegistration>[0] | null>(null);
 
   useEffect(() => {
     if (!record || record.status !== "pending" || !record.id) return;
     let stop = false;
     const timer = window.setInterval(() => {
-      void refreshIntent({ data: record.id })
+      const resubmit = lastSubmit.current;
+      void refreshOrResubmit(
+        () => refreshIntent({ data: record.id }),
+        resubmit ? () => submitRegistration(resubmit) : null,
+      )
         .then((result) => {
           if (stop) return;
           setRecord({
@@ -125,7 +131,8 @@ function CreateFlow() {
         capabilities: parsed.value.capabilities,
       });
       setPhase("submitting");
-      const result = await submitRegistration({ data: { ...parsed.value, txHash: hash } });
+      lastSubmit.current = { data: { ...parsed.value, txHash: hash } };
+      const result = await submitRegistration(lastSubmit.current);
       setRecord({
         id: result.intent.id,
         status: result.intent.status,

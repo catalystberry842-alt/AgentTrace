@@ -560,17 +560,30 @@ export const getFirewall = createServerFn({ method: "GET" })
 
 export const listConfigurableAgents = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
+  .validator((input: unknown) => {
+    // Optional connected wallet. Agents it owns onchain are configurable by it; the firewall
+    // contract still checks the owner on every configuration transaction.
+    const owner =
+      input && typeof input === "object" ? (input as { owner?: unknown }).owner : undefined;
+    return {
+      owner:
+        typeof owner === "string" && /^0x[a-fA-F0-9]{40}$/.test(owner) ? owner.toLowerCase() : null,
+    };
+  })
+  .handler(async ({ context, data }) => {
     await syncRegistrySafe();
     const sql = await getSql();
     const rows = await sql<{ agent_id: string; name: string; owner: string }>`
-      select distinct a.agent_id, a.name, a.owner
+      select a.agent_id, a.name, a.owner
       from indexed_agents a
       where a.chain_id = ${MONAD_TESTNET.chainId}
         and a.active = true
-        and a.owner in (
-          select lower(owner_address) from registration_intents
-          where user_id = ${context.userId} and owner_address is not null
+        and (
+          a.owner = ${data.owner ?? ""}
+          or a.owner in (
+            select lower(owner_address) from registration_intents
+            where user_id = ${context.userId} and owner_address is not null
+          )
         )
       order by a.agent_id::bigint asc
     `;

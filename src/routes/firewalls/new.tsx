@@ -1,13 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { getChainStatus, listConfigurableAgents, refreshFirewallIntent, submitFirewall } from "@/lib/agents/functions";
+import {
+  getChainStatus,
+  listConfigurableAgents,
+  refreshFirewallIntent,
+  submitFirewall,
+} from "@/lib/agents/functions";
 import type { FirewallIntentStatus } from "@/lib/agents/types";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Shell } from "@/components/shell";
-import { Button, ErrorNote, SkeletonLines, StatusText, TextInput } from "@/components/ui";
+import { Button, ErrorNote, Mono, SkeletonLines, StatusText, TextInput } from "@/components/ui";
 import { CopyButton } from "@/components/values";
 import { formatAgentId, shortHash, txUrl } from "@/lib/format";
+import { refreshOrResubmit } from "@/lib/agents/resilient";
+import { useWalletAccount } from "@/lib/chain/wallet-account";
 
 export const Route = createFileRoute("/firewalls/new")({ component: NewFirewallPage });
 
@@ -53,26 +60,34 @@ function CreateFlow() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [record, setRecord] = useState<RecordState | null>(null);
+  const lastSubmit = useRef<Parameters<typeof submitFirewall>[0] | null>(null);
+  const wallet = useWalletAccount();
 
   useEffect(() => {
+    if (!wallet.ready) return;
     let cancelled = false;
-    listConfigurableAgents()
+    listConfigurableAgents({ data: { owner: wallet.address ?? undefined } })
       .then((result) => {
         if (!cancelled) setAgents(result.agents);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Could not load your agents.");
+        if (!cancelled)
+          setLoadError(err instanceof Error ? err.message : "Could not load your agents.");
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [wallet.ready, wallet.address]);
 
   useEffect(() => {
     if (!record || record.status !== "pending" || !record.id) return;
     let stop = false;
     const timer = window.setInterval(() => {
-      void refreshFirewallIntent({ data: record.id })
+      const resubmit = lastSubmit.current;
+      void refreshOrResubmit(
+        () => refreshFirewallIntent({ data: record.id }),
+        resubmit ? () => submitFirewall(resubmit) : null,
+      )
         .then((result) => {
           if (stop) return;
           setRecord({
@@ -84,7 +99,8 @@ function CreateFlow() {
           });
         })
         .catch((err: unknown) => {
-          if (!stop) setError(err instanceof Error ? err.message : "Could not refresh the transaction.");
+          if (!stop)
+            setError(err instanceof Error ? err.message : "Could not refresh the transaction.");
         });
     }, 2500);
     return () => {
@@ -139,7 +155,8 @@ function CreateFlow() {
           status: "failed",
           txHash: null,
           chainFirewallId: null,
-          detail: "Agent Firewall is not deployed. No transaction was sent and no firewall id was assigned.",
+          detail:
+            "Agent Firewall is not deployed. No transaction was sent and no firewall id was assigned.",
         });
         return;
       }
@@ -158,7 +175,8 @@ function CreateFlow() {
         ],
       });
       setBusy("Creating firewall...");
-      const result = await submitFirewall({ data: { ...draft, txHash: hash } });
+      lastSubmit.current = { data: { ...draft, txHash: hash } };
+      const result = await submitFirewall(lastSubmit.current);
       setRecord({
         id: result.intent.id,
         status: result.intent.status,
@@ -186,10 +204,28 @@ function CreateFlow() {
       <div>
         <h1 className="text-2xl font-medium tracking-tight">Create a firewall</h1>
         <p className="mt-3 max-w-md text-sm text-muted">
-          No active agents are indexed for this account. A firewall can only be created for an agent you already
-          own.
+          {wallet.address ? (
+            <>
+              No active agents are indexed for <Mono>{shortHash(wallet.address)}</Mono>. A firewall
+              can only be created for an agent this wallet owns.
+            </>
+          ) : (
+            "No active agents found. Connect the wallet that owns the agent. A firewall can only be created for an agent you own."
+          )}
         </p>
-        <Link to="/agents/new" className="mt-6 inline-flex h-11 items-center text-sm text-fg underline-offset-4 hover:underline">
+        {!wallet.address && wallet.available ? (
+          <Button type="button" className="mt-6" onClick={() => void wallet.connect()}>
+            Connect wallet
+          </Button>
+        ) : null}
+        {!wallet.available && wallet.ready ? (
+          <p className="mt-3 text-sm text-muted">No wallet found in this browser.</p>
+        ) : null}
+        {wallet.error ? <p className="mt-3 text-sm text-danger">{wallet.error}</p> : null}
+        <Link
+          to="/agents/new"
+          className="mt-6 inline-flex h-11 items-center text-sm text-fg underline-offset-4 hover:underline"
+        >
           Create an agent
         </Link>
       </div>
@@ -201,12 +237,18 @@ function CreateFlow() {
     return (
       <div>
         <p className="text-sm text-muted">Firewall created</p>
-        <h1 className="mt-2 text-3xl font-medium tracking-tight">Firewall {formatAgentId(record.chainFirewallId)}</h1>
+        <h1 className="mt-2 text-3xl font-medium tracking-tight">
+          Firewall {formatAgentId(record.chainFirewallId)}
+        </h1>
         <p className="mt-2 font-mono text-xs text-faint">firewallId: {record.chainFirewallId}</p>
         <p className="mt-8 text-sm text-muted">Transaction</p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           {href ? (
-            <a href={href} className="inline-flex h-11 items-center text-sm text-fg underline-offset-4 hover:underline" rel="noreferrer">
+            <a
+              href={href}
+              className="inline-flex h-11 items-center text-sm text-fg underline-offset-4 hover:underline"
+              rel="noreferrer"
+            >
               View on Monad Explorer
             </a>
           ) : (
@@ -214,7 +256,9 @@ function CreateFlow() {
           )}
           {record.txHash ? <CopyButton value={record.txHash} label="transaction" /> : null}
         </div>
-        {record.txHash ? <p className="mt-2 font-mono text-xs text-faint">{shortHash(record.txHash)}</p> : null}
+        {record.txHash ? (
+          <p className="mt-2 font-mono text-xs text-faint">{shortHash(record.txHash)}</p>
+        ) : null}
         <div className="mt-8">
           <Link
             to="/agents/$agentId/firewall"
@@ -234,10 +278,12 @@ function CreateFlow() {
         <StatusText tone="pending">Pending</StatusText>
         <h1 className="mt-3 text-3xl font-medium tracking-tight">Creating firewall...</h1>
         <p className="mt-3 max-w-md text-sm text-muted">
-          The transaction is on Monad. This page stays here until FirewallCreated is indexed. No firewall id is
-          shown before that.
+          The transaction is on Monad. This page stays here until FirewallCreated is indexed. No
+          firewall id is shown before that.
         </p>
-        {record.txHash ? <p className="mt-6 font-mono text-xs text-faint">{shortHash(record.txHash)}</p> : null}
+        {record.txHash ? (
+          <p className="mt-6 font-mono text-xs text-faint">{shortHash(record.txHash)}</p>
+        ) : null}
       </div>
     );
   }
@@ -246,7 +292,9 @@ function CreateFlow() {
     return (
       <div>
         <h1 className="text-3xl font-medium tracking-tight">Firewall creation failed</h1>
-        <p className="mt-3 max-w-md text-sm text-muted">{record.detail ?? "The firewall was not created."}</p>
+        <p className="mt-3 max-w-md text-sm text-muted">
+          {record.detail ?? "The firewall was not created."}
+        </p>
         <div className="mt-8">
           <Button
             type="button"
@@ -304,7 +352,9 @@ function CreateFlow() {
             placeholder="0x…"
             onChange={(event) => setExecutor(event.target.value.trim())}
           />
-          <p className="mt-3 text-sm text-muted">The executor can submit actions. It cannot change this firewall.</p>
+          <p className="mt-3 text-sm text-muted">
+            The executor can submit actions. It cannot change this firewall.
+          </p>
         </div>
       ) : null}
       {step === 2 ? (
@@ -328,8 +378,8 @@ function CreateFlow() {
             Allow value transfer
           </label>
           <p className="text-sm text-muted">
-            Left off, this firewall cannot move value. No contracts or functions are allowed until you add them
-            after the firewall exists.
+            Left off, this firewall cannot move value. No contracts or functions are allowed until
+            you add them after the firewall exists.
           </p>
           {allowValue ? (
             <div className="space-y-4">
@@ -357,7 +407,12 @@ function CreateFlow() {
       ) : null}
       {step === 3 ? (
         <dl className="mt-8">
-          <Review label="Agent" value={selected ? `${selected.name} · Agent ${formatAgentId(selected.agentId)}` : agentId} />
+          <Review
+            label="Agent"
+            value={
+              selected ? `${selected.name} · Agent ${formatAgentId(selected.agentId)}` : agentId
+            }
+          />
           <Review label="Executor" value={executor} />
           <Review label="Value transfer" value={allowValue ? "Enabled" : "Disabled"} />
           <Review label="Per transaction" value={allowValue ? `${maxTx} wei` : "0 wei"} />
@@ -367,7 +422,12 @@ function CreateFlow() {
       ) : null}
       <div className="mt-10 flex gap-3">
         {step > 0 ? (
-          <Button type="button" variant="ghost" onClick={() => setStep((value) => value - 1)} disabled={Boolean(busy)}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setStep((value) => value - 1)}
+            disabled={Boolean(busy)}
+          >
             Back
           </Button>
         ) : null}

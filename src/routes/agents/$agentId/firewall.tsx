@@ -4,6 +4,7 @@ import { getAgentLayers, getChainStatus, getFirewall, getPublicAgent, refreshFir
 import type { FirewallAction, FirewallIntentStatus, FirewallRecord, IndexedAgent } from "@/lib/agents/types";
 import { GROK_PROVIDERS, authEnabled, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { refreshOrResubmit } from "@/lib/agents/resilient";
 import { AgentFrame } from "@/components/agent-nav";
 import { FirewallControls } from "@/routes/firewalls/$firewallId";
 import { Shell } from "@/components/shell";
@@ -310,12 +311,17 @@ function CreateFirewall({ agent, onCreated }: { agent: IndexedAgent; onCreated: 
 
   const created = useRef(onCreated);
   created.current = onCreated;
+  const lastSubmit = useRef<Parameters<typeof submitFirewall>[0] | null>(null);
 
   useEffect(() => {
     if (!record || record.status !== "pending" || !record.id) return;
     let stop = false;
     const timer = window.setInterval(() => {
-      void refreshFirewallIntent({ data: record.id })
+      const resubmit = lastSubmit.current;
+      void refreshOrResubmit(
+        () => refreshFirewallIntent({ data: record.id }),
+        resubmit ? () => submitFirewall(resubmit) : null,
+      )
         .then((result) => {
           if (stop) return;
           const next = {
@@ -435,7 +441,8 @@ function CreateFirewall({ agent, onCreated }: { agent: IndexedAgent; onCreated: 
         ],
       });
       setPhase("submitting");
-      const result = await submitFirewall({ data: { ...draft, txHash: hash } });
+      lastSubmit.current = { data: { ...draft, txHash: hash } };
+      const result = await submitFirewall(lastSubmit.current);
       const next = {
         id: result.intent.id,
         status: result.intent.status,

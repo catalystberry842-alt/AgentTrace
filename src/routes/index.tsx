@@ -23,7 +23,8 @@ const LAYERS = [
 
 function Home() {
   const { user, isPending } = useCurrentUserState();
-  if (!isPending && user) return <YourAgents />;
+  // Wallet-only deployments have no account to own a dashboard; everyone sees the product page.
+  if (authEnabled && !isPending && user) return <YourAgents />;
   return <Landing pending={isPending} />;
 }
 
@@ -154,6 +155,11 @@ function Landing({ pending }: { pending: boolean }) {
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
           {pending ? <div className="h-11 w-full animate-pulse rounded-sm bg-subtle sm:w-40" /> : null}
+          {!pending && !authEnabled ? (
+            <Link to="/agents/new" className={primaryClass}>
+              Create your first agent
+            </Link>
+          ) : null}
           {!pending && authEnabled && google ? (
             <button type="button" disabled={signingIn} onClick={createAgent} className={primaryClass}>
               {signingIn ? "Continuing…" : "Create your first agent"}

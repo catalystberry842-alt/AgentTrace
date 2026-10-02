@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
-import { signOut } from "@/lib/auth/client";
+import { authEnabled, signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { searchTrace } from "@/lib/agents/functions";
 
@@ -168,6 +168,12 @@ function CommandSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o
 }
 
 function AccountMenu({ onNavigate }: { onNavigate?: () => void }) {
+  // Wallet-only deployments have no application account: the wallet signs each chain action.
+  if (!authEnabled) return null;
+  return <AccountMenuSignedIn onNavigate={onNavigate} />;
+}
+
+function AccountMenuSignedIn({ onNavigate }: { onNavigate?: () => void }) {
   const { user, isPending } = useCurrentUserState();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);

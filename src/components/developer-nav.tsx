@@ -50,6 +50,14 @@ export function DeveloperGate({ callbackURL, children }: { callbackURL: string; 
       </button>
     );
   }
+  if (!authEnabled) {
+    return (
+      <p className="mt-8 max-w-md text-sm text-muted">
+        API keys and webhooks belong to an application account. This deployment runs without
+        accounts: the wallet signs every chain action, and the public read API works without a key.
+      </p>
+    );
+  }
   if (!user) return <p className="mt-8 text-sm text-muted">Sign in is not available.</p>;
   return children;
 }

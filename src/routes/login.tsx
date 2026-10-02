@@ -14,6 +14,7 @@ function Login() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  if (!authEnabled) return <Navigate to="/agents" />;
   if (!isPending && user) return <Navigate to="/agents" />;
 
   return (

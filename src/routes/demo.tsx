@@ -16,6 +16,7 @@ import {
 import type { Capability } from "@/lib/agents/types";
 import { GROK_PROVIDERS, authEnabled, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { refreshOrResubmit } from "@/lib/agents/resilient";
 import { Shell } from "@/components/shell";
 import { Button, ChainError, Mono, SkeletonLines, StatusText } from "@/components/ui";
 import { demoProtocolAbi } from "@/lib/chain/abi";
@@ -198,14 +199,17 @@ function DemoPage() {
         capabilities: AGENT.capabilities,
       });
       setPhase("Waiting for confirmation");
-      const submitted = await submitRegistration({
-        data: { ...AGENT, txHash: hash },
-      });
+      const registration = { data: { ...AGENT, txHash: hash } };
+      const submitted = await submitRegistration(registration);
       let intent = submitted.intent;
       for (let attempt = 0; attempt < 8 && intent.status === "pending"; attempt += 1) {
         setPhase("Transaction confirmed. Waiting for AgentTrace indexing...");
         await sleep(2000);
-        const next = await refreshIntent({ data: intent.id });
+        const id = intent.id;
+        const next = await refreshOrResubmit(
+          () => refreshIntent({ data: id }),
+          () => submitRegistration(registration),
+        );
         intent = next.intent;
       }
       if (!intent.chainAgentId) {
@@ -245,7 +249,7 @@ function DemoPage() {
         args: [BigInt(saved.agentId), saved.executor as `0x${string}`, false, 0n, 0n, 86400n],
       });
       setPhase("Waiting for confirmation");
-      const submitted = await submitFirewall({
+      const creation = {
         data: {
           agentId: saved.agentId,
           executor: saved.executor as `0x${string}`,
@@ -255,12 +259,17 @@ function DemoPage() {
           periodDuration: "86400",
           txHash: hash,
         },
-      });
+      };
+      const submitted = await submitFirewall(creation);
       let intent = submitted.intent;
       for (let attempt = 0; attempt < 8 && !intent.chainFirewallId && intent.status === "pending"; attempt += 1) {
         setPhase("Transaction confirmed. Waiting for AgentTrace indexing...");
         await sleep(2000);
-        const next = await refreshFirewallIntent({ data: intent.id });
+        const id = intent.id;
+        const next = await refreshOrResubmit(
+          () => refreshFirewallIntent({ data: id }),
+          () => submitFirewall(creation),
+        );
         intent = next.intent;
       }
       if (!intent.chainFirewallId) {
@@ -451,9 +460,23 @@ function DemoPage() {
         functionName: "execute",
         args: [BigInt(saved.firewallId), demoAddress as `0x${string}`, 0n, data],
       });
+      // The wallet may skip simulation. Only the receipt says whether the firewall let it through.
+      let state: string = "pending";
+      for (let attempt = 0; attempt < 10 && state === "pending"; attempt += 1) {
+        const result = await confirmFirewallTx({ data: { txHash: hash, firewallId: saved.firewallId } });
+        state = result.state;
+        if (state === "pending") await sleep(2000);
+      }
+      if (state === "reverted") {
+        setBlocked("The firewall rejected withdraw. The transaction reverted onchain.");
+        return;
+      }
       setFailed({
         step: "Blocked action",
-        detail: "The firewall accepted withdraw. A blocked result is not shown.",
+        detail:
+          state === "pending"
+            ? "The withdraw transaction has not confirmed yet. No blocked result is shown."
+            : "The firewall accepted withdraw. A blocked result is not shown.",
         txHash: hash,
         retry: "withdraw",
       });
