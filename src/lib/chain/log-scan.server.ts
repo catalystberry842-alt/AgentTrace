@@ -23,6 +23,8 @@ export async function scanLogs(opts: {
   latest: number;
   apply: (log: Log) => Promise<unknown>;
   saveCursor: (scannedTo: number) => Promise<void>;
+  /** Every log read, in order, including ones already in the database. */
+  seen?: Log[];
 }): Promise<number> {
   const range = logBlockRange();
   const deadline = Date.now() + scanBudgetMs();
@@ -41,7 +43,10 @@ export async function scanLogs(opts: {
       ),
     );
     for (let i = 0; i < windows.length; i++) {
-      for (const log of results[i]) await opts.apply(log);
+      for (const log of results[i]) {
+        await opts.apply(log);
+        opts.seen?.push(log);
+      }
       scannedTo = windows[i][1];
       await opts.saveCursor(scannedTo);
     }

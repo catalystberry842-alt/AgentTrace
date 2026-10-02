@@ -4,10 +4,13 @@ import { agentFirewallAbi } from "@/lib/chain/abi";
 import { deployment } from "@/lib/chain/deployment";
 import { readAddress } from "@/lib/chain/addresses.server";
 import {
+  applyRegistryLog,
+  configuredDeployBlock,
   configuredRegistry,
   getPublicClient,
   syncRegistry,
 } from "@/lib/chain/indexer.server";
+import { cacheKey, hydrateFromCache, recordScan } from "@/lib/chain/chain-cache.server";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { scanLogs } from "@/lib/chain/log-scan.server";
 import { ensureExecutedProof } from "@/lib/chain/proof-store";
@@ -37,7 +40,11 @@ function syncSlot(): SyncSlot {
 }
 
 export function configuredFirewall(): `0x${string}` | null {
-  return readAddress(deployment.agentFirewall, "MONAD_TESTNET_AGENT_FIREWALL", "AGENT_FIREWALL_ADDRESS");
+  return readAddress(
+    deployment.agentFirewall,
+    "MONAD_TESTNET_AGENT_FIREWALL",
+    "AGENT_FIREWALL_ADDRESS",
+  );
 }
 
 export function configuredFirewallDeployBlock(): number | null {
@@ -76,7 +83,9 @@ function asBool(value: unknown): boolean {
 
 function jsonArgs(value: unknown): { [key: string]: JsonValue } {
   return JSON.parse(
-    JSON.stringify(value, (_key, item: unknown) => (typeof item === "bigint" ? item.toString() : item)),
+    JSON.stringify(value, (_key, item: unknown) =>
+      typeof item === "bigint" ? item.toString() : item,
+    ),
   ) as { [key: string]: JsonValue };
 }
 
@@ -179,7 +188,13 @@ async function mutate(
   sql: Sql,
   event: string,
   args: Record<string, unknown>,
-  ctx: { firewallId: string; agentId: string; blockNumber: number; logIndex: number; txHash: string },
+  ctx: {
+    firewallId: string;
+    agentId: string;
+    blockNumber: number;
+    logIndex: number;
+    txHash: string;
+  },
 ): Promise<void> {
   const nowTs = asUint(args.timestamp) ?? "0";
   if (event === "FirewallCreated") {
@@ -459,7 +474,8 @@ export async function syncFirewall(force = false): Promise<IndexerStatus> {
   if (deployBlock == null) {
     return {
       status: "error",
-      detail: "Firewall address is set but the deployment block is unknown, so indexing has not started.",
+      detail:
+        "Firewall address is set but the deployment block is unknown, so indexing has not started.",
     };
   }
 
@@ -471,16 +487,34 @@ export async function syncFirewall(force = false): Promise<IndexerStatus> {
   state.inflight = (async () => {
     const client = getPublicClient();
     const sql = await getSql();
+    const key = cacheKey(firewall, deployBlock);
+    const registry = configuredRegistry();
+    const registryBlock = configuredDeployBlock();
+    await hydrateFromCache(sql, [
+      ...(registry && registryBlock != null
+        ? [
+            {
+              key: cacheKey(registry, registryBlock),
+              address: registry,
+              apply: (log: Log) => applyRegistryLog(sql, registry, log),
+            },
+          ]
+        : []),
+      { key, address: firewall, apply: (log: Log) => applyFirewallLog(sql, firewall, log) },
+    ]);
     const latest = Number(await client.getBlockNumber());
-    if (deployBlock > latest) throw new Error("Firewall deployment block is ahead of the chain head.");
+    if (deployBlock > latest)
+      throw new Error("Firewall deployment block is ahead of the chain head.");
     const rows = await sql<{ last_scanned_block: number | string }>`
       select last_scanned_block from indexer_state
       where chain_id = ${MONAD_TESTNET.chainId} and contract_address = ${firewall}
     `;
     let from = rows[0] ? Number(rows[0].last_scanned_block) + 1 : deployBlock;
     if (from < deployBlock) from = deployBlock;
+    const seen: Log[] = [];
     const scannedTo = await scanLogs({
       client,
+      seen,
       address: firewall,
       from,
       latest,
@@ -500,6 +534,7 @@ export async function syncFirewall(force = false): Promise<IndexerStatus> {
       lastScannedBlock: Math.max(scannedTo, from - 1),
       latestBlock: latest,
     };
+    await recordScan(key, seen, result.lastScannedBlock);
     // Still catching up: do not cache, so the next request continues from the saved cursor.
     if (result.lastScannedBlock < latest) return result;
     state.last = result;
@@ -514,7 +549,12 @@ export async function syncFirewall(force = false): Promise<IndexerStatus> {
 export async function syncFirewallSafe(): Promise<IndexerStatus> {
   try {
     if (configuredRegistry()) await syncRegistry().catch(() => undefined);
-    return await syncFirewall();
+    const status = await syncFirewall();
+    // Executions replayed into a fresh database start as "executed". Re-run the receipt check for a
+    // few of them so verified status does not depend on which server instance answered.
+    const { settlePendingProofs } = await import("@/lib/chain/proof.server");
+    await settlePendingProofs(3).catch(() => undefined);
+    return status;
   } catch (err) {
     const result: IndexerStatus = {
       status: "error",
@@ -583,7 +623,12 @@ async function attachRules(rows: FirewallRow[]): Promise<FirewallRecord[]> {
     where chain_id = ${MONAD_TESTNET.chainId} and firewall_id = any(${ids}::text[])
     order by target asc
   `;
-  const functions = await sql<{ firewall_id: string; target: string; selector: string; active: boolean }>`
+  const functions = await sql<{
+    firewall_id: string;
+    target: string;
+    selector: string;
+    active: boolean;
+  }>`
     select firewall_id, target, selector, active from firewall_functions
     where chain_id = ${MONAD_TESTNET.chainId} and firewall_id = any(${ids}::text[])
     order by target asc, selector asc
@@ -683,7 +728,10 @@ function mapAction(row: {
   };
 }
 
-export async function listFirewallActions(firewallId: string, limit = 50): Promise<FirewallAction[]> {
+export async function listFirewallActions(
+  firewallId: string,
+  limit = 50,
+): Promise<FirewallAction[]> {
   const sql = await getSql();
   const rows = await sql<Parameters<typeof mapAction>[0]>`
     select a.execution_id, a.firewall_id, a.agent_id, a.executor, a.target, a.selector, a.value,
@@ -761,11 +809,17 @@ export async function ingestFirewallReceipt(
     throw err;
   }
   if (receipt.status !== "success") {
-    return { state: "reverted", error: "Transaction reverted on Monad. The firewall was not changed." };
+    return {
+      state: "reverted",
+      error: "Transaction reverted on Monad. The firewall was not changed.",
+    };
   }
   const logs = receipt.logs.filter((log) => log.address.toLowerCase() === firewall);
   if (!logs.length) {
-    return { state: "empty", error: "The transaction confirmed but it did not emit a firewall event." };
+    return {
+      state: "empty",
+      error: "The transaction confirmed but it did not emit a firewall event.",
+    };
   }
   const ids = new Set<string>();
   for (const log of logs) {

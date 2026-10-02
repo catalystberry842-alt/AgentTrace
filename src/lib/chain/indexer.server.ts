@@ -13,6 +13,7 @@ import { readAddress } from "@/lib/chain/addresses.server";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { monadRpcUrl, monadTransport } from "@/lib/chain/rpc.server";
 import { scanLogs } from "@/lib/chain/log-scan.server";
+import { cacheKey, hydrateFromCache, recordScan } from "@/lib/chain/chain-cache.server";
 import { capabilitiesFromChain } from "@/lib/agents/capabilities";
 import type { AgentEvent, IndexedAgent, IndexerStatus, JsonValue } from "@/lib/agents/types";
 
@@ -232,6 +233,10 @@ export async function syncRegistry(force = false): Promise<IndexerStatus> {
   state.inflight = (async () => {
     const client = getPublicClient();
     const sql = await getSql();
+    const key = cacheKey(registry, deployBlock);
+    await hydrateFromCache(sql, [
+      { key, address: registry, apply: (log) => applyRegistryLog(sql, registry, log) },
+    ]);
     const latest = Number(await client.getBlockNumber());
     if (deployBlock > latest) {
       throw new Error("Deployment block is ahead of the chain head.");
@@ -243,8 +248,10 @@ export async function syncRegistry(force = false): Promise<IndexerStatus> {
     let from = rows[0] ? Number(rows[0].last_scanned_block) + 1 : deployBlock;
     if (from < deployBlock) from = deployBlock;
 
+    const seen: Log[] = [];
     const scannedTo = await scanLogs({
       client,
+      seen,
       address: registry,
       from,
       latest,
@@ -265,6 +272,7 @@ export async function syncRegistry(force = false): Promise<IndexerStatus> {
       lastScannedBlock: Math.max(scannedTo, from - 1),
       latestBlock: latest,
     };
+    await recordScan(key, seen, result.lastScannedBlock);
     // Still catching up: do not cache, so the next request continues from the saved cursor.
     if (result.lastScannedBlock < latest) return result;
     state.last = result;
