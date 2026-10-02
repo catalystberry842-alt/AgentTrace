@@ -8,7 +8,7 @@ import { readAddress } from "@/lib/chain/addresses.server";
 import { configuredFirewall } from "@/lib/chain/firewall.server";
 import { getPublicClient } from "@/lib/chain/indexer.server";
 import { MONAD_TESTNET } from "@/lib/chain/network";
-import { monadRpcUrl } from "@/lib/chain/rpc.server";
+import { monadRpcUrl, monadTransport } from "@/lib/chain/rpc.server";
 import { assessExecution, VERIFICATION_METHOD, type AssessedLog } from "@/lib/chain/proof-assess";
 import { computeProofHash } from "@/lib/chain/proof-hash";
 import { publishDeveloperEvent } from "@/lib/developer/webhooks.server";
@@ -543,7 +543,7 @@ export async function anchorVerifiedProof(
   const rpcUrl = monadRpcUrl();
   const chain = monadChain();
   const wallet = createWalletClient({ account, chain, transport: http(rpcUrl, { timeout: 20_000 }) });
-  const publicClient = createPublicClient({ chain, transport: http(rpcUrl, { timeout: 20_000 }) });
+  const publicClient = createPublicClient({ chain, transport: monadTransport(20_000) });
   try {
     const hash = await wallet.writeContract({
       address: contract,

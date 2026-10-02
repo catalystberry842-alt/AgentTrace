@@ -9,6 +9,7 @@ import {
   syncRegistry,
 } from "@/lib/chain/indexer.server";
 import { MONAD_TESTNET } from "@/lib/chain/network";
+import { scanLogs } from "@/lib/chain/log-scan.server";
 import { ensureExecutedProof } from "@/lib/chain/proof-store";
 import { publishDeveloperEvent } from "@/lib/developer/webhooks.server";
 import type {
@@ -20,7 +21,6 @@ import type {
   JsonValue,
 } from "@/lib/agents/types";
 
-const CHUNK = 2_000;
 const SYNC_INTERVAL_MS = 15_000;
 
 type SyncSlot = {
@@ -479,24 +479,29 @@ export async function syncFirewall(force = false): Promise<IndexerStatus> {
     `;
     let from = rows[0] ? Number(rows[0].last_scanned_block) + 1 : deployBlock;
     if (from < deployBlock) from = deployBlock;
-    while (from <= latest) {
-      const to = Math.min(from + CHUNK - 1, latest);
-      const logs = await client.getLogs({
-        address: firewall,
-        fromBlock: BigInt(from),
-        toBlock: BigInt(to),
-      });
-      for (const log of logs) await applyFirewallLog(sql, firewall, log);
-      await sql`
-        insert into indexer_state (chain_id, contract_address, last_scanned_block, updated_at)
-        values (${MONAD_TESTNET.chainId}, ${firewall}, ${to}, now())
-        on conflict (chain_id, contract_address) do update set
-          last_scanned_block = excluded.last_scanned_block,
-          updated_at = now()
-      `;
-      from = to + 1;
-    }
-    const result: IndexerStatus = { status: "ok", lastScannedBlock: latest, latestBlock: latest };
+    const scannedTo = await scanLogs({
+      client,
+      address: firewall,
+      from,
+      latest,
+      apply: (log) => applyFirewallLog(sql, firewall, log),
+      saveCursor: async (to) => {
+        await sql`
+          insert into indexer_state (chain_id, contract_address, last_scanned_block, updated_at)
+          values (${MONAD_TESTNET.chainId}, ${firewall}, ${to}, now())
+          on conflict (chain_id, contract_address) do update set
+            last_scanned_block = excluded.last_scanned_block,
+            updated_at = now()
+        `;
+      },
+    });
+    const result: IndexerStatus = {
+      status: "ok",
+      lastScannedBlock: Math.max(scannedTo, from - 1),
+      latestBlock: latest,
+    };
+    // Still catching up: do not cache, so the next request continues from the saved cursor.
+    if (result.lastScannedBlock < latest) return result;
     state.last = result;
     state.at = Date.now();
     return result;

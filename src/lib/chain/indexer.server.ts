@@ -2,7 +2,6 @@ import {
   createPublicClient,
   decodeEventLog,
   decodeFunctionData,
-  http,
   type Log,
   type TransactionReceipt,
 } from "viem";
@@ -12,7 +11,8 @@ import { agentRegistryAbi } from "@/lib/chain/abi";
 import { deployment } from "@/lib/chain/deployment";
 import { readAddress } from "@/lib/chain/addresses.server";
 import { MONAD_TESTNET } from "@/lib/chain/network";
-import { monadRpcUrl } from "@/lib/chain/rpc.server";
+import { monadRpcUrl, monadTransport } from "@/lib/chain/rpc.server";
+import { scanLogs } from "@/lib/chain/log-scan.server";
 import { capabilitiesFromChain } from "@/lib/agents/capabilities";
 import type { AgentEvent, IndexedAgent, IndexerStatus, JsonValue } from "@/lib/agents/types";
 
@@ -29,7 +29,7 @@ export function getPublicClient() {
   });
   return createPublicClient({
     chain: monadChain,
-    transport: http(rpcUrl, { timeout: 8_000 }),
+    transport: monadTransport(),
   });
 }
 const SYNC_INTERVAL_MS = 15_000;
@@ -56,8 +56,6 @@ export function configuredDeployBlock(): number | null {
   if (/^\d+$/.test(fromEnv)) return Number(fromEnv);
   return deployment.deployBlock;
 }
-
-const CHUNK = 2_000;
 
 function asStringList(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String);
@@ -245,29 +243,30 @@ export async function syncRegistry(force = false): Promise<IndexerStatus> {
     let from = rows[0] ? Number(rows[0].last_scanned_block) + 1 : deployBlock;
     if (from < deployBlock) from = deployBlock;
 
-    while (from <= latest) {
-      const to = Math.min(from + CHUNK - 1, latest);
-      const logs = await client.getLogs({
-        address: registry,
-        fromBlock: BigInt(from),
-        toBlock: BigInt(to),
-      });
-      for (const log of logs) await applyRegistryLog(sql, registry, log);
-      await sql`
-        insert into indexer_state (chain_id, contract_address, last_scanned_block, updated_at)
-        values (${MONAD_TESTNET.chainId}, ${registry}, ${to}, now())
-        on conflict (chain_id, contract_address) do update set
-          last_scanned_block = excluded.last_scanned_block,
-          updated_at = now()
-      `;
-      from = to + 1;
-    }
+    const scannedTo = await scanLogs({
+      client,
+      address: registry,
+      from,
+      latest,
+      apply: (log) => applyRegistryLog(sql, registry, log),
+      saveCursor: async (to) => {
+        await sql`
+          insert into indexer_state (chain_id, contract_address, last_scanned_block, updated_at)
+          values (${MONAD_TESTNET.chainId}, ${registry}, ${to}, now())
+          on conflict (chain_id, contract_address) do update set
+            last_scanned_block = excluded.last_scanned_block,
+            updated_at = now()
+        `;
+      },
+    });
 
     const result: IndexerStatus = {
       status: "ok",
-      lastScannedBlock: latest,
+      lastScannedBlock: Math.max(scannedTo, from - 1),
       latestBlock: latest,
     };
+    // Still catching up: do not cache, so the next request continues from the saved cursor.
+    if (result.lastScannedBlock < latest) return result;
     state.last = result;
     state.at = Date.now();
     return result;

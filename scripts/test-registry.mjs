@@ -138,12 +138,23 @@ assert.equal(reverted(await call(alice, "deactivateAgent", [1n])), "InactiveAgen
 assert.equal(returned(await call(alice, "getAgentCount"), "getAgentCount"), 3n);
 assert.equal(returned(await call(alice, "agentExists", [1n]), "agentExists"), true);
 
-const rpc = await fetch("https://testnet-rpc.monad.xyz", {
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
-});
-assert.equal((await rpc.json()).result, "0x279f");
+// Live check: at least one public Monad testnet endpoint answers with chain id 10143.
+let liveChainId = null;
+for (const url of ["https://testnet-rpc.monad.xyz", "https://rpc-testnet.monadinfra.com", "https://rpc.ankr.com/monad_testnet"]) {
+  try {
+    const rpc = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    liveChainId = (await rpc.json()).result;
+    break;
+  } catch {
+    // try the next public endpoint
+  }
+}
+assert.equal(liveChainId, "0x279f");
 
 const vite = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "error" });
 try {

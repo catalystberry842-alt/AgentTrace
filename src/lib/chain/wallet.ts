@@ -1,4 +1,4 @@
-import { BaseError, createPublicClient, encodeFunctionData, http } from "viem";
+import { BaseError, createPublicClient, encodeFunctionData, fallback, http } from "viem";
 import { defineChain } from "viem";
 import { agentFirewallAbi, agentRegistryAbi } from "@/lib/chain/abi";
 import { MONAD_TESTNET } from "@/lib/chain/network";
@@ -61,7 +61,7 @@ async function ensureMonad(eth: EthereumProvider): Promise<void> {
           chainId: MONAD_TESTNET.chainIdHex,
           chainName: MONAD_TESTNET.name,
           nativeCurrency: { name: "MON", symbol: MONAD_TESTNET.nativeSymbol, decimals: 18 },
-          rpcUrls: [MONAD_TESTNET.rpcUrl],
+          rpcUrls: [MONAD_TESTNET.rpcUrl, ...MONAD_TESTNET.fallbackRpcUrls],
           blockExplorerUrls: [MONAD_TESTNET.explorerUrl],
         },
       ],
@@ -170,7 +170,9 @@ export async function sendFirewallTransaction(input: {
   });
   const client = createPublicClient({
     chain: monadChain,
-    transport: http(MONAD_TESTNET.rpcUrl, { timeout: 8_000 }),
+    transport: fallback(
+      [MONAD_TESTNET.rpcUrl, ...MONAD_TESTNET.fallbackRpcUrls].map((url) => http(url, { timeout: 8_000 })),
+    ),
   });
   try {
     await client.call({
