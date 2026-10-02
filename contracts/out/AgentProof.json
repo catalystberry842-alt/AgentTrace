@@ -1,0 +1,283 @@
+{
+  "contractName": "AgentProof",
+  "compiler": "0.8.31+commit.fd3a2265.Emscripten.clang",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "verifier_",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "executionId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "AnchorNotFound",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "executionId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "ProofAlreadyAnchored",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "proofHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "ProofHashAlreadyUsed",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "caller",
+          "type": "address"
+        }
+      ],
+      "name": "Unauthorized",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroAddress",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "proofHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "executionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "agentId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "firewallId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "transactionHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "verifier",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "anchoredAt",
+          "type": "uint64"
+        }
+      ],
+      "name": "ExecutionProofAnchored",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "verifier",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "updatedAt",
+          "type": "uint64"
+        }
+      ],
+      "name": "VerifierUpdated",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "proofHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "executionId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "agentId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "firewallId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "transactionHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "anchorProof",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "executionId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getAnchor",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32",
+              "name": "proofHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "executionId",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "agentId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "firewallId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "transactionHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "anchoredAt",
+              "type": "uint64"
+            },
+            {
+              "internalType": "address",
+              "name": "verifier",
+              "type": "address"
+            }
+          ],
+          "internalType": "struct AgentProof.Anchor",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "executionId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "isAnchored",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "verifier_",
+          "type": "address"
+        }
+      ],
+      "name": "setVerifier",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "verifier",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608034609157601f61051638819003918201601f19168301916001600160401b03831184841017609557808492602094604052833981010312609157516001600160a01b0381169081900360915780156082575f80546001600160a01b031990811633179091556001805490911691909117905560405161046c90816100aa8239f35b63d92e233d60e01b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe6080806040526004361015610012575f80fd5b5f3560e01c9081632b7ac3f3146103df575080634f0b5801146103a65780635437988d1461031a5780637feb51d9146102015780638da5cb5b146101da5763f1f2f4d71461005e575f80fd5b346101d65760a03660031901126101d6576004356024356044359160643560843560018060a01b036001541633036101c357821580156101bb575b80156101b3575b6101a457835f52600260205267ffffffffffffffff600560405f2001541661019157825f52600360205260405f205461017e577fb10e92ac2442389b81deb7e3dafa192ee6d5efc6d9a88b32af28c0758a3921e691608091855f52600260205267ffffffffffffffff600560405f2087815588600182015589600282015584600382015583600482015501805468010000000000000000600160e01b033360401b16908342169063ffffffff60e01b1617178155865f5260036020528760405f205554169060405192835260208301523360408301526060820152a4005b82636c23955f60e01b5f5260045260245ffd5b8363ecd41eb560e01b5f5260045260245ffd5b63d92e233d60e01b5f5260045ffd5b5080156100a0565b508315610099565b63472511eb60e11b5f523360045260245ffd5b5f80fd5b346101d6575f3660031901126101d6575f546040516001600160a01b039091168152602090f35b346101d65760203660031901126101d6576004355f60c0610220610402565b8281528260208201528260408201528260608201528260808201528260a08201520152805f52600260205260405f20610257610402565b9080548252600181015490602083019182526002810154604084019081526003820154906060850191825260056004840154936080870194855201549367ffffffffffffffff85169660a087019780895260c088019660018060a01b039060401c168752156103085750604080519651875290516020870152905190850152516060840152516080830152915167ffffffffffffffff1660a082015290516001600160a01b031660c082015260e090f35b633340d4c960e21b5f5260045260245ffd5b346101d65760203660031901126101d6576004356001600160a01b038116908190036101d6575f546001600160a01b031633036101c35780156101a457806bffffffffffffffffffffffff60a01b60015416176001557f134ee5f8cfcaf83a82f56eda7d52f6f7ff645db074c7b1a87c2d560adcc92573602060405167ffffffffffffffff42168152a2005b346101d65760203660031901126101d6576004355f526002602052602067ffffffffffffffff600560405f200154161515604051908152f35b346101d6575f3660031901126101d6576001546001600160a01b03168152602090f35b6040519060e0820182811067ffffffffffffffff82111761042257604052565b634e487b7160e01b5f52604160045260245ffdfea2646970667358221220b3d35c4547764ba1631324a5da3001cd2de0ab48ea5a702558a1b9e8cf57cd1664736f6c634300081f0033",
+  "deployedBytecode": "0x6080806040526004361015610012575f80fd5b5f3560e01c9081632b7ac3f3146103df575080634f0b5801146103a65780635437988d1461031a5780637feb51d9146102015780638da5cb5b146101da5763f1f2f4d71461005e575f80fd5b346101d65760a03660031901126101d6576004356024356044359160643560843560018060a01b036001541633036101c357821580156101bb575b80156101b3575b6101a457835f52600260205267ffffffffffffffff600560405f2001541661019157825f52600360205260405f205461017e577fb10e92ac2442389b81deb7e3dafa192ee6d5efc6d9a88b32af28c0758a3921e691608091855f52600260205267ffffffffffffffff600560405f2087815588600182015589600282015584600382015583600482015501805468010000000000000000600160e01b033360401b16908342169063ffffffff60e01b1617178155865f5260036020528760405f205554169060405192835260208301523360408301526060820152a4005b82636c23955f60e01b5f5260045260245ffd5b8363ecd41eb560e01b5f5260045260245ffd5b63d92e233d60e01b5f5260045ffd5b5080156100a0565b508315610099565b63472511eb60e11b5f523360045260245ffd5b5f80fd5b346101d6575f3660031901126101d6575f546040516001600160a01b039091168152602090f35b346101d65760203660031901126101d6576004355f60c0610220610402565b8281528260208201528260408201528260608201528260808201528260a08201520152805f52600260205260405f20610257610402565b9080548252600181015490602083019182526002810154604084019081526003820154906060850191825260056004840154936080870194855201549367ffffffffffffffff85169660a087019780895260c088019660018060a01b039060401c168752156103085750604080519651875290516020870152905190850152516060840152516080830152915167ffffffffffffffff1660a082015290516001600160a01b031660c082015260e090f35b633340d4c960e21b5f5260045260245ffd5b346101d65760203660031901126101d6576004356001600160a01b038116908190036101d6575f546001600160a01b031633036101c35780156101a457806bffffffffffffffffffffffff60a01b60015416176001557f134ee5f8cfcaf83a82f56eda7d52f6f7ff645db074c7b1a87c2d560adcc92573602060405167ffffffffffffffff42168152a2005b346101d65760203660031901126101d6576004355f526002602052602067ffffffffffffffff600560405f200154161515604051908152f35b346101d6575f3660031901126101d6576001546001600160a01b03168152602090f35b6040519060e0820182811067ffffffffffffffff82111761042257604052565b634e487b7160e01b5f52604160045260245ffdfea2646970667358221220b3d35c4547764ba1631324a5da3001cd2de0ab48ea5a702558a1b9e8cf57cd1664736f6c634300081f0033"
+}

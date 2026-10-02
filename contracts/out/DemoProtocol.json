@@ -1,0 +1,189 @@
+{
+  "contractName": "DemoProtocol",
+  "compiler": "0.8.31+commit.fd3a2265.Emscripten.clang",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "agentId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "InsufficientDeposit",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroAmount",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "agentId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "Deposited",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "agentId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amountIn",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amountOut",
+          "type": "uint256"
+        }
+      ],
+      "name": "Swapped",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "agentId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "Withdrawn",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "agentId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "deposit",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "agentId",
+          "type": "uint256"
+        }
+      ],
+      "name": "deposits",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "agentId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amountIn",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amountOut",
+          "type": "uint256"
+        }
+      ],
+      "name": "swap",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "agentId",
+          "type": "uint256"
+        }
+      ],
+      "name": "swapped",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "agentId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "withdraw",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608080604052346015576102ed908161001a8239f35b5f80fdfe60806040526004361015610011575f80fd5b5f3560e01c8063441a3e70146101e457806356c1cc0e146101ba5780639d9892cd146100f3578063b02c43d0146100ca5763e2bbb15814610050575f80fd5b346100c65761005e36610273565b811580156100be575b6100af5760207f06da3309189fa49284f335d2c2bcb4cb0b8ad2a59ad92a9bdebeeb8f1ceba51191835f525f825260405f206100a48282546102aa565b9055604051908152a2005b631f2a200560e01b5f5260045ffd5b508015610067565b5f80fd5b346100c65760203660031901126100c6576004355f525f602052602060405f2054604051908152f35b346100c65760603660031901126100c657600435602435604435821580156101b2575b80156101aa575b6100af57825f525f60205260405f20548083116101935791604091610163827ffef152b1d7e6e5eab416514383395204200e65849d1ecb011b2b56555e657cc695610289565b855f525f602052835f2055845f526001602052825f206101848282546102aa565b905582519182526020820152a2005b82846312e1fa3760e11b5f5260045260245260445ffd5b50801561011d565b508115610116565b346100c65760203660031901126100c6576004355f526001602052602060405f2054604051908152f35b346100c6576101f236610273565b8115801561026b575b6100af57815f525f60205260405f205480821161025457816102407f0c875c8d391179c5cf7ad8303d268efd50b8beb78b671f85cd54bfb91eb8ef4093602093610289565b845f525f835260405f2055604051908152a2005b50906312e1fa3760e11b5f5260045260245260445ffd5b5080156101fb565b60409060031901126100c6576004359060243590565b9190820391821161029657565b634e487b7160e01b5f52601160045260245ffd5b919082018092116102965756fea2646970667358221220cb8eebdc7ac876bc5c2f102bf51a61678ccfefb268a35b4d4155756531295d7e64736f6c634300081f0033",
+  "deployedBytecode": "0x60806040526004361015610011575f80fd5b5f3560e01c8063441a3e70146101e457806356c1cc0e146101ba5780639d9892cd146100f3578063b02c43d0146100ca5763e2bbb15814610050575f80fd5b346100c65761005e36610273565b811580156100be575b6100af5760207f06da3309189fa49284f335d2c2bcb4cb0b8ad2a59ad92a9bdebeeb8f1ceba51191835f525f825260405f206100a48282546102aa565b9055604051908152a2005b631f2a200560e01b5f5260045ffd5b508015610067565b5f80fd5b346100c65760203660031901126100c6576004355f525f602052602060405f2054604051908152f35b346100c65760603660031901126100c657600435602435604435821580156101b2575b80156101aa575b6100af57825f525f60205260405f20548083116101935791604091610163827ffef152b1d7e6e5eab416514383395204200e65849d1ecb011b2b56555e657cc695610289565b855f525f602052835f2055845f526001602052825f206101848282546102aa565b905582519182526020820152a2005b82846312e1fa3760e11b5f5260045260245260445ffd5b50801561011d565b508115610116565b346100c65760203660031901126100c6576004355f526001602052602060405f2054604051908152f35b346100c6576101f236610273565b8115801561026b575b6100af57815f525f60205260405f205480821161025457816102407f0c875c8d391179c5cf7ad8303d268efd50b8beb78b671f85cd54bfb91eb8ef4093602093610289565b845f525f835260405f2055604051908152a2005b50906312e1fa3760e11b5f5260045260245260445ffd5b5080156101fb565b60409060031901126100c6576004359060243590565b9190820391821161029657565b634e487b7160e01b5f52601160045260245ffd5b919082018092116102965756fea2646970667358221220cb8eebdc7ac876bc5c2f102bf51a61678ccfefb268a35b4d4155756531295d7e64736f6c634300081f0033"
+}

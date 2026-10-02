@@ -1,0 +1,174 @@
+@import "tailwindcss";
+
+/*
+  AgentTrace tokens.
+  Spacing uses the Tailwind scale: xs=1 (4px), sm=2, md=4, lg=6, xl=8, 2xl=12, 3xl=16, 4xl=24.
+  Motion: fast=150ms, normal=200ms, slow=300ms.
+*/
+
+@theme {
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --color-bg: #09090b;
+  --color-surface: #111113;
+  --color-surface-elevated: #18181b;
+  --color-elevated: #111113;
+  --color-subtle: #18181b;
+
+  --color-fg: #f4f4f5;
+  --color-muted: #a1a1aa;
+  --color-faint: #71717a;
+
+  --color-border: #27272a;
+  --color-border-subtle: #1c1c20;
+  --color-border-strong: #3f3f46;
+
+  --color-accent: #f4f4f5;
+  --color-accent-fg: #09090b;
+
+  --color-success: #8eae96;
+  --color-ok: #8eae96;
+  --color-warning: #c2ae8a;
+  --color-warn: #c2ae8a;
+  --color-error: #c47a74;
+  --color-danger: #c47a74;
+  --color-info: #8fa3b5;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    min-height: 100vh;
+    text-rendering: optimizeLegibility;
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--color-border-strong);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: #2e2e33;
+    color: var(--color-fg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  .type-display {
+    font-size: 2.5rem;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+
+  .type-heading {
+    font-size: 1.5rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .type-subheading {
+    font-size: 1.125rem;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1.35;
+  }
+
+  .type-body {
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+
+  .type-small {
+    font-size: 0.875rem;
+    line-height: 1.45;
+  }
+
+  .type-caption {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  .type-technical,
+  .type-code {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
+  .page-enter {
+    animation: page-enter 200ms var(--ease-out);
+  }
+
+  .skeleton {
+    animation: skeleton 1.4s ease-in-out infinite;
+    background: var(--color-subtle);
+    border-radius: var(--radius-sm);
+  }
+}
+
+@media (min-width: 768px) {
+  .type-display {
+    font-size: 3.25rem;
+  }
+
+  .type-heading {
+    font-size: 1.875rem;
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes skeleton {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
