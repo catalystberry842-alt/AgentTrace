@@ -41,7 +41,7 @@ The execution id is `keccak256(abi.encode(firewallId, agentId, executor, nonce, 
 
 ## Events and indexer
 
-The indexer reads logs from the configured registry and firewall addresses on chain 10143. It stores chain id, contract address, transaction hash, block number, and log index. Reprocessing the same log does not create a second row. If a contract address is unset, the indexer reports that the contract is not deployed and does not invent agents or executions.
+The indexer reads logs from the configured registry and firewall addresses on chain 10143. Public Monad RPCs accept at most 100 blocks per `eth_getLogs` call, so the indexer scans in 100-block windows and saves its cursor after each one. A sync call has a short time budget; the next call resumes from the cursor. It stores chain id, contract address, transaction hash, block number, and log index. Reprocessing the same log does not create a second row. If a contract address is unset, the indexer reports that the contract is not deployed and does not invent agents or executions.
 
 Derived rows can be rebuilt by scanning those logs again.
 

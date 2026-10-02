@@ -4,6 +4,8 @@ Solidity 0.8.31. No proxy, no `delegatecall`, no `tx.origin`. Custom errors. Che
 
 None of these addresses are filled in `src/lib/chain/deployment.ts`. A deployment is real only after a confirmed transaction, or after the matching environment variable is set to a `0x` address.
 
+`npm run deploy:testnet` (`scripts/deploy-contracts.mjs`) deploys all four contracts to Monad testnet and writes each address only after its receipt succeeds and bytecode is present. See the README section "Deploying the contracts to Monad testnet".
+
 ## AgentRegistry
 
 Purpose: persistent agent identity.

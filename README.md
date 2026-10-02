@@ -35,7 +35,9 @@ See [docs/architecture.md](docs/architecture.md) and [docs/security.md](docs/sec
 
 ## Monad
 
-Monad testnet (chain id 10143) is EVM-compatible. AgentTrace contracts are ordinary Solidity 0.8.31 contracts. The indexer and proof verifier read logs and receipts from the public testnet RPC (`https://testnet-rpc.monad.xyz`). Permissions are enforced in `AgentFirewall`, not in the client.
+Monad testnet (chain id 10143) is EVM-compatible. AgentTrace contracts are ordinary Solidity 0.8.31 contracts. The indexer and proof verifier read logs and receipts from the public testnet RPC (`https://testnet-rpc.monad.xyz`). If that endpoint fails or rate-limits, the server falls back to the other public testnet endpoints listed in the Monad docs (`https://rpc-testnet.monadinfra.com`, then `https://rpc.ankr.com/monad_testnet`). Setting `MONAD_TESTNET_RPC_URL` replaces the list with that one endpoint. Permissions are enforced in `AgentFirewall`, not in the client.
+
+Public Monad RPCs limit `eth_getLogs` to 100 blocks per call (see [RPC limits](https://docs.monad.xyz/reference/rpc-limits)). The indexer scans in 100-block windows, a few windows at a time, and saves its cursor after each window. One sync call stops after a short time budget (4 s by default, `MONAD_INDEXER_BUDGET_MS`) and the next request continues from the saved block, so a page never waits on a long catch-up. Registrations, firewall changes, and executions submitted through the app are also confirmed directly from their transaction receipts, so they appear right away even while the history scan is behind.
 
 No throughput or gas figure is claimed here. The deployment record in this repository does not contain contract addresses until a confirmed deployment is written, or until the addresses are set in the environment.
 
@@ -80,7 +82,26 @@ Not implemented:
 
 Addresses stay null until a confirmed transaction exists. Environment variables may override the record. See [docs/contracts.md](docs/contracts.md).
 
+## Deploying the contracts to Monad testnet
+
+One command deploys all four contracts in order (registry, firewall with the registry address, proof anchor, demo protocol) and writes every confirmed address, block, and transaction hash to `src/lib/chain/deployment.ts`:
+
+```bash
+MONAD_DEPLOYER_PRIVATE_KEY=0x... npm run deploy:testnet
+git add src/lib/chain/deployment.ts && git commit -m "Record Monad testnet deployment"
+```
+
+- The deployer needs testnet MON from [faucet.monad.xyz](https://faucet.monad.xyz). The four deployments use about 3.1M gas; at the 102 gwei testnet gas price seen on 2 Oct 2026 that is about 0.4 MON with the script's 20% margin. The script checks the balance first and sends nothing if it is too low.
+- It refuses any chain other than 10143.
+- A contract already in the record (with bytecode on chain) is skipped, so a failed run can be re-run.
+- The AgentProof verifier is the address of `AGENT_PROOF_VERIFIER_PRIVATE_KEY` when set, else `AGENT_PROOF_VERIFIER_ADDRESS`, else the deployer. The owner can change it later with `setVerifier`.
+- The private key is read from the environment only. Do not commit it or put it in a hosted app's environment.
+
+Committing the record means every build uses the addresses without extra environment variables.
+
 ## Local development
+
+Requires Node.js 22.12 or newer (TanStack Start). `.nvmrc` pins 22.
 
 ```bash
 npm install
@@ -106,16 +127,28 @@ npm run build
 ## Testing
 
 ```bash
-npm test
-node scripts/test-registry.mjs
-node scripts/test-firewall.mjs
-node scripts/test-proof.mjs
-node scripts/test-demo.mjs
-node scripts/test-developer.mjs
-node scripts/test-reputation.mjs
+npm test                # app unit tests, auth tests, indexer log-window tests
+npm run test:contracts  # registry, firewall, proof, demo, developer, reputation in a local EVM
+npm run test:workspace  # Grok App Builder workspace template tests (see note)
 ```
 
-`npm test` runs script unit tests and auth tests. The `node scripts/test-*.mjs` commands compile or load the contracts in a local EVM and check registry, firewall, proof, demo, developer, and reputation behavior. They do not replace a live Monad testnet deployment.
+`npm test` runs the app unit and auth tests and checks that the indexer never asks the RPC for more than 100 blocks, applies logs in order, and resumes from its saved cursor. `npm run test:contracts` loads the contracts in a local EVM and checks registry, firewall, proof, demo, developer, and reputation behavior; the registry test also checks that a public Monad testnet endpoint answers with chain id 10143. These do not replace a live Monad testnet deployment.
+
+`npm run test:workspace` runs the Grok App Builder template tests that came with the project scaffold. Some of them read workspace files that are not in this repository (`.grok/`, `AGENTS.md`) or expect the untouched template, so they fail in a fresh clone. They do not test AgentTrace behavior.
+
+### End-to-end check on a local Monad testnet fork
+
+This runs the real contracts, indexer, and proof verifier against a fork of Monad testnet without spending testnet MON. It needs [Foundry](https://book.getfoundry.sh/) for `anvil` and `cast`.
+
+```bash
+anvil --fork-url https://rpc-testnet.monadinfra.com --chain-id 10143 --port 8545
+# anvil's public dev key #0 is pre-funded on the fork only
+MONAD_DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  MONAD_DEPLOY_RPC_URL=http://127.0.0.1:8545 npm run deploy:testnet
+MONAD_TESTNET_RPC_URL=http://127.0.0.1:8545 npm run dev
+```
+
+Then register an agent, create a firewall, allow `DemoProtocol.deposit`, and call `execute` from the executor (with `cast send`, or a wallet pointed at `http://127.0.0.1:8545`). `/agents`, `/firewalls/1`, `/proofs`, and `POST /api/proofs/<executionId>/verify` then show the indexed agent, the execution, and a `receipt_verified` proof. Restore `src/lib/chain/deployment.ts` afterwards (`git checkout src/lib/chain/deployment.ts`) so fork addresses are never committed.
 
 ## Demo
 
@@ -136,7 +169,7 @@ Script: [docs/demo-script.md](docs/demo-script.md).
 
 ## Roadmap
 
-- Deploy the four contracts to Monad testnet and record the confirmed addresses
+- Deploy the four contracts to Monad testnet (`npm run deploy:testnet`) and commit the confirmed addresses
 - Configure the proof-anchor verifier
 - Let a configured executor submit `execute` from the API without weakening firewall checks
 
