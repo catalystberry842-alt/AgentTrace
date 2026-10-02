@@ -55,7 +55,7 @@ Implemented in this repository:
 - Developer API, hashed API keys, rate limits, and HMAC-signed webhooks
 - TypeScript SDK in `sdk/`
 - Wallet signing in the browser only when a chain action is submitted
-- Google account sign-in for the AgentTrace account, kept separate from the onchain owner
+- Google account sign-in for the AgentTrace account, kept separate from the onchain owner, or a wallet-only mode with no accounts
 
 Not implemented:
 
@@ -69,7 +69,8 @@ Not implemented:
 - React 19, TanStack Start, Tailwind CSS
 - Solidity 0.8.31, viem, EthereumJS VM for contract tests
 - Postgres when `DATABASE_URL` is set, otherwise PGLite
-- Better Auth for the application account
+- Optional Vercel Blob cache of indexed chain logs for serverless hosting
+- Better Auth for the application account (optional; wallet-only mode turns it off)
 
 ## Smart contracts
 
@@ -109,6 +110,25 @@ npm run dev
 ```
 
 The dev server listens on port 8080.
+
+## Hosting on Vercel
+
+The app builds with the Nitro `vercel` preset (`npm run build` writes `.vercel/output`). The hosted deployment runs in **wallet-only mode**:
+
+- `VITE_AUTH_ENABLED=false`. There are no application accounts and no sign-in. Identity is the connected wallet: agents and firewalls belong to whoever owns them onchain, and every chain action is signed by that wallet. The `/firewalls/new` page lists agents the connected wallet owns onchain. Account settings, API keys, and webhooks are hidden, because they need a persistent account database.
+- No `DATABASE_URL`. Each serverless instance uses its own in-memory PGLite database. Do not set `DATABASE_URL` with auth off: the server refuses that combination on purpose, so account data is never shared under a fallback identity.
+- Chain data is the source of truth. Every instance rebuilds its view from Monad logs. To avoid rescanning from the deploy block on every cold start, set `BLOB_READ_WRITE_TOKEN` (connect a private Vercel Blob store to the project). The indexer then keeps the raw logs it has seen and the last scanned block in one private blob (`agenttrace/chain-cache-10143.json`, keyed by contract address and deploy block) and replays them into a fresh instance. The cache holds only public chain data. Without the token, the indexer still works and simply scans from the deploy block.
+- A transaction submitted through the app is confirmed from its own receipt. If that request lands on a different instance than the one that recorded the intent, the browser resubmits the intent from the transaction hash, so the confirmation does not depend on which instance answers.
+- Node.js 22.x.
+
+```bash
+vercel link --scope <team>
+vercel env add VITE_AUTH_ENABLED production   # value: false
+vercel blob create-store agenttrace-chain-cache --access private   # optional cache
+vercel deploy --prod
+```
+
+With the GitHub repository connected to the Vercel project, every push to `main` redeploys. Contract addresses come from the committed `src/lib/chain/deployment.ts`, so no address variables are needed once the deployment is recorded.
 
 ## Environment variables
 

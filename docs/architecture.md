@@ -43,6 +43,8 @@ The execution id is `keccak256(abi.encode(firewallId, agentId, executor, nonce, 
 
 The indexer reads logs from the configured registry and firewall addresses on chain 10143. Public Monad RPCs accept at most 100 blocks per `eth_getLogs` call, so the indexer scans in 100-block windows and saves its cursor after each one. A sync call has a short time budget; the next call resumes from the cursor. It stores chain id, contract address, transaction hash, block number, and log index. Reprocessing the same log does not create a second row. If a contract address is unset, the indexer reports that the contract is not deployed and does not invent agents or executions.
 
+On serverless hosts each instance starts with an empty in-memory database. When `BLOB_READ_WRITE_TOKEN` is set, the indexer also keeps the raw logs it has applied and the last scanned block in one private Vercel Blob object, keyed by contract address and deploy block. A new instance replays those logs through the same handlers and continues from the cached block. The cache contains only public chain data; deleting it only costs a rescan. Executions replayed this way are queued for receipt verification again, so proof state is recomputed from chain data rather than copied.
+
 Derived rows can be rebuilt by scanning those logs again.
 
 ## Proof verification
@@ -55,7 +57,7 @@ The proof hash is documented in [contracts.md](contracts.md). Anchoring sends th
 
 ## Outcome verification
 
-Outcome checks are separate from execution proof. `EVENT_EMITTED` reads the target logs. `VALUE_CHANGED`, `BALANCE_CHANGED`, and `STATE_CHANGED` are verified only for Demo Protocol `deposits` or `swapped`, and only when this transaction emitted a matching event and the onchain value equals the expected value. Anything else is rejected or `unverifiable`. It is not marked verified.
+Outcome checks are separate from execution proof. `EVENT_EMITTED` reads the target logs. `VALUE_CHANGED`, `BALANCE_CHANGED`, and `STATE_CHANGED` are verified only for Demo Protocol `deposits` or `swapped`, and only when this transaction emitted a matching event and the onchain value equals the expected value. Anything else is rejected or `unverifiable`. It is not marked verified. An expected event on the Demo Protocol is decoded with the real ABI, including indexed parameters such as `agentId`. For other targets the first indexed layout of the given signature that decodes the log is used, and the outcome is verified only when the decoded arguments match the expected ones.
 
 ## API and SDK
 
