@@ -30,6 +30,12 @@ function downList(): Map<string, number> {
 }
 const DOWN_MS = 60_000;
 const NETWORK_ERRORS = new Set(["HttpRequestError", "TimeoutError", "LimitExceededRpcError", "UnknownRpcError"]);
+/**
+ * Lookups where a null answer can just mean this node is behind. A transaction the wallet saw
+ * mined may not be on every public node yet, so null moves on to the next endpoint; only the
+ * last endpoint's null is returned.
+ */
+const ASK_NEXT_ON_NULL = new Set(["eth_getTransactionByHash", "eth_getTransactionReceipt"]);
 
 /**
  * viem transport that moves to the next public endpoint when one errors or times out.
@@ -65,15 +71,19 @@ function tracked(url: string, timeout: number, down: Map<string, number>, last: 
   });
   return ((params: Parameters<Transport>[0]) => {
     const t = base(params);
-    const request: typeof t.request = async (args, options) => {
+    const request = (async (args: Parameters<typeof t.request>[0], options?: Parameters<typeof t.request>[1]) => {
       if (!last && (down.get(url) ?? 0) > Date.now()) throw new Error(`${url} is cooling down after a failure`);
       try {
-        return await t.request(args, options);
+        const result = await t.request(args, options);
+        if (!last && result == null && ASK_NEXT_ON_NULL.has(args.method)) {
+          throw new Error(`${url} has not seen this transaction yet`);
+        }
+        return result;
       } catch (err) {
         if (err instanceof Error && NETWORK_ERRORS.has(err.name)) markDown();
         throw err;
       }
-    };
+    }) as typeof t.request;
     return { ...t, request };
   }) as Transport;
 }
