@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, decodeEventLog, http, type Hex } from "viem";
+import { createPublicClient, createWalletClient, decodeEventLog, type Hex, type Log } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { defineChain } from "viem";
 import { getSql, type Sql } from "@/lib/db";
@@ -9,6 +9,7 @@ import { configuredFirewall } from "@/lib/chain/firewall.server";
 import { configuredRegistry, getPublicClient } from "@/lib/chain/indexer.server";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { monadRpcUrl, monadTransport } from "@/lib/chain/rpc.server";
+import { cacheKey, cachedContractLogs, recordScan } from "@/lib/chain/chain-cache.server";
 import { assessExecution, VERIFICATION_METHOD, type AssessedLog } from "@/lib/chain/proof-assess";
 import { computeProofHash } from "@/lib/chain/proof-hash";
 import { publishDeveloperEvent } from "@/lib/developer/webhooks.server";
@@ -248,7 +249,23 @@ async function markRequested(sql: Sql, executionId: string): Promise<void> {
   `;
 }
 
+/**
+ * Verify an indexed execution, then pick up an anchor that already exists for it. Anchoring can
+ * happen on another serverless instance, so a verified proof that is not anchored locally is
+ * checked against the cached anchor events and, failing that, against AgentProof itself.
+ */
 export async function verifyIndexedExecution(executionId: string, force = false): Promise<ProofRecord | null> {
+  const proof = await verifyExecutionOnce(executionId, force);
+  if (!proof || proof.verificationStatus !== "receipt_verified" || proof.anchored) return proof;
+  try {
+    if (await restoreAnchor(proof)) return (await getExecutionProof(proof.executionId)) ?? proof;
+  } catch (err) {
+    console.warn("[agenttrace-anchor] restore failed:", err instanceof Error ? err.message : err);
+  }
+  return proof;
+}
+
+async function verifyExecutionOnce(executionId: string, force = false): Promise<ProofRecord | null> {
   const id = executionId.trim().toLowerCase();
   if (!/^0x[a-fA-F0-9]{64}$/.test(id)) return null;
   const sql = await getSql();
@@ -528,6 +545,65 @@ async function receiptStillMatches(proof: ProofRecord): Promise<string | null> {
   }
 }
 
+function proofCacheKey(): string | null {
+  const contract = configuredProofAnchor();
+  const block = configuredProofDeployBlock();
+  return contract && block != null ? cacheKey(contract, block) : null;
+}
+
+const anchorChecks: Map<string, number> =
+  ((globalThis as { __agenttraceAnchorChecks?: Map<string, number> }).__agenttraceAnchorChecks ??= new Map());
+
+/**
+ * Mark a verified proof as anchored when an anchor already exists for it. Uses the anchor event
+ * recorded in the chain cache (which carries the anchor transaction), else AgentProof.getAnchor
+ * (which proves the anchor but not which transaction wrote it). Returns true when it is anchored.
+ */
+async function restoreAnchor(proof: ProofRecord, force = false): Promise<boolean> {
+  const contract = configuredProofAnchor();
+  if (!contract || !proof.proofHash) return false;
+  const id = proof.executionId.toLowerCase();
+  const last = anchorChecks.get(id) ?? 0;
+  if (!force && Date.now() - last < 60_000) return false;
+  anchorChecks.set(id, Date.now());
+  const key = proofCacheKey();
+  if (key) {
+    for (const log of await cachedContractLogs(key)) {
+      if (log.topics.some((t) => t?.toLowerCase() === id)) await applyProofLog(log);
+    }
+    if ((await getExecutionProof(id))?.anchored) return true;
+  }
+  const client = getPublicClient();
+  const anchored = await client.readContract({
+    address: contract,
+    abi: agentProofAbi,
+    functionName: "isAnchored",
+    args: [id as Hex],
+  });
+  if (!anchored) return false;
+  const anchor = (await client.readContract({
+    address: contract,
+    abi: agentProofAbi,
+    functionName: "getAnchor",
+    args: [id as Hex],
+  })) as { proofHash: Hex; transactionHash: Hex };
+  if (
+    anchor.proofHash.toLowerCase() !== proof.proofHash.toLowerCase() ||
+    anchor.transactionHash.toLowerCase() !== proof.txHash.toLowerCase()
+  ) {
+    return false;
+  }
+  const sql = await getSql();
+  await sql`
+    update execution_proofs set anchored = true, updated_at = now()
+    where chain_id = ${MONAD_TESTNET.chainId}
+      and execution_id = ${id}
+      and proof_hash = ${proof.proofHash.toLowerCase()}
+      and verification_status = 'receipt_verified'
+  `;
+  return true;
+}
+
 export async function anchorVerifiedProof(
   executionId: string,
 ): Promise<{ anchored: boolean; reason: string; txHash: string | null; proof: ProofRecord | null }> {
@@ -563,9 +639,17 @@ export async function anchorVerifiedProof(
   const account = privateKeyToAccount(key);
   const still = await receiptStillMatches(proof);
   if (still) return { anchored: false, reason: still, txHash: null, proof };
-  const rpcUrl = monadRpcUrl();
+  const already = async () => {
+    const next = await getExecutionProof(proof.executionId);
+    return { anchored: true, reason: "Already anchored onchain.", txHash: next?.anchorTxHash ?? null, proof: next };
+  };
+  try {
+    if (await restoreAnchor(proof, true)) return already();
+  } catch (err) {
+    console.warn("[agenttrace-anchor] pre-check failed:", err instanceof Error ? err.message : err);
+  }
   const chain = monadChain();
-  const wallet = createWalletClient({ account, chain, transport: http(rpcUrl, { timeout: 20_000 }) });
+  const wallet = createWalletClient({ account, chain, transport: monadTransport(20_000) });
   const publicClient = createPublicClient({ chain, transport: monadTransport(20_000) });
   try {
     const hash = await wallet.writeContract({
@@ -585,6 +669,11 @@ export async function anchorVerifiedProof(
       return { anchored: false, reason: "The anchor transaction reverted. The proof was not anchored.", txHash: hash, proof };
     }
     for (const log of receipt.logs) await applyProofLog(log);
+    const key = proofCacheKey();
+    if (key) {
+      const own = receipt.logs.filter((l) => l.address.toLowerCase() === contract.toLowerCase());
+      await recordScan(key, own as Log[], Number(receipt.blockNumber));
+    }
     const next = await getExecutionProof(proof.executionId);
     if (!next?.anchored) {
       return {
@@ -597,6 +686,13 @@ export async function anchorVerifiedProof(
     return { anchored: true, reason: "Proof anchored.", txHash: hash, proof: next };
   } catch (err) {
     const message = err instanceof Error ? err.message : "The anchor transaction was not sent.";
+    if (/ProofAlreadyAnchored/.test(message)) {
+      try {
+        if (await restoreAnchor(proof, true)) return already();
+      } catch {
+        // fall through to the original error
+      }
+    }
     return { anchored: false, reason: message, txHash: null, proof };
   }
 }

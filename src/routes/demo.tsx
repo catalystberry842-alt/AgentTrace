@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { encodeFunctionData } from "viem";
 import {
+  anchorProof,
   confirmFirewallTx,
   getChainStatus,
   readDemoState,
@@ -44,6 +45,7 @@ type Saved = {
   proofStatus: string | null;
   outcomeStatus: string | null;
   observed: string | null;
+  anchorTxHash?: string | null;
 };
 
 type Failed = { step: string; detail: string; txHash: string | null; retry: "agent" | "firewall" | "permission" | "deposit" | "withdraw" };
@@ -420,7 +422,15 @@ function DemoPage() {
         setPhase(outcome.status === "unverifiable" ? "Outcome unavailable" : "Outcome verification failed");
         throw new Error(outcome.reason || "The outcome was not verified.");
       }
-      setPhase("Outcome verified");
+      setPhase("Outcome verified. Anchoring proof onchain...");
+      // Anchoring is a server-side verifier transaction. It never undoes a verified outcome.
+      try {
+        const anchored = await anchorProof({ data: action.executionId });
+        setSaved((current) => ({ ...current, anchorTxHash: anchored.anchored ? anchored.txHash ?? "anchored" : null }));
+        setPhase(anchored.anchored ? "Outcome verified. Proof anchored onchain." : "Outcome verified");
+      } catch {
+        setPhase("Outcome verified");
+      }
     } catch (err) {
       setFailed({
         step: "Run deposit",
@@ -428,7 +438,7 @@ function DemoPage() {
         txHash: hash,
         retry: "deposit",
       });
-      if (phase !== "Outcome verified") setPhase(null);
+      if (!phase?.startsWith("Outcome verified")) setPhase(null);
     } finally {
       setBusy(false);
     }
@@ -625,6 +635,7 @@ function DemoPage() {
                 <Stage label="Execution" value={saved.executionId ? saved.executionId.slice(0, 10) : null} />
                 <Stage label="Proof" value={saved.proofStatus === "receipt_verified" ? proofStatusLabel(saved.proofStatus) : null} />
                 <Stage label="Outcome" value={saved.outcomeStatus === "verified" ? "Outcome verified" : null} />
+                <Stage label="Anchor" value={saved.anchorTxHash ? "Proof hash anchored onchain" : null} />
               </ol>
             </section>
           ) : null}
@@ -640,6 +651,7 @@ function DemoPage() {
                 <Row label="Expected" value="100" />
                 <Row label="Observed" value={observedAmount ?? saved.observed ?? "—"} />
                 <Row label="Evidence" value="Deposited event" />
+                <Row label="Anchor" value={saved.anchorTxHash && saved.anchorTxHash !== "anchored" ? saved.anchorTxHash : saved.anchorTxHash ? "Anchored" : "Not anchored"} />
               </dl>
               <div className="mt-4 flex flex-col items-start gap-1 text-sm">
                 {saved.agentId ? (
@@ -660,6 +672,11 @@ function DemoPage() {
                 {txHref ? (
                   <a href={txHref} className="text-muted hover:text-fg" rel="noreferrer">
                     View transaction
+                  </a>
+                ) : null}
+                {txUrl(saved.anchorTxHash ?? null) ? (
+                  <a href={txUrl(saved.anchorTxHash ?? null) ?? undefined} className="text-muted hover:text-fg" rel="noreferrer">
+                    View anchor transaction
                   </a>
                 ) : null}
               </div>

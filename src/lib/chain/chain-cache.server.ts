@@ -47,6 +47,7 @@ type State = {
   dirty: boolean;
   requests: OutcomeRequest[];
   requestsReadAt: number;
+  logsReadAt?: Record<string, number>;
 };
 const slot = globalThis as typeof globalThis & { __agenttraceChainCache?: State };
 function state(): State {
@@ -245,4 +246,22 @@ export async function cachedOutcomeRequests(): Promise<OutcomeRequest[]> {
     s.requests = mergeRequests(remote?.outcomeRequests, s.requests);
   }
   return s.requests;
+}
+
+/**
+ * Logs cached for one contract key, including ones other instances wrote (re-read from the blob
+ * at most once a minute). Used for logs that are recorded when they are produced rather than
+ * scanned, such as the proof anchor events.
+ */
+export async function cachedContractLogs(key: string): Promise<Log[]> {
+  if (!chainCacheEnabled()) return [];
+  const s = state();
+  s.logsReadAt ??= {};
+  if (Date.now() - (s.logsReadAt[key] ?? 0) >= 60_000) {
+    s.logsReadAt[key] = Date.now();
+    const remote = await readRemote();
+    const entry = remote?.contracts[key];
+    if (entry) s.pending[key] = mergeEntry(s.pending[key], entry);
+  }
+  return (s.pending[key]?.logs ?? []).map(fromCached);
 }
