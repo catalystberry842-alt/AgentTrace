@@ -448,6 +448,7 @@ export const getAgentActivityPage = createServerFn({ method: "GET" })
   .validator((input: { agentId: string; status?: string; offset?: number }) => input)
   .handler(async ({ data }) => {
     if (!/^[1-9]\d*$/.test(data.agentId)) return { agent: null, items: [], total: 0, limit: 50, offset: 0 };
+    await syncFirewallSafe();
     const agent = await getIndexedAgent(data.agentId);
     if (!agent) return { agent: null, items: [], total: 0, limit: 50, offset: 0 };
     const status = data.status === "verified" || data.status === "unverified" ? data.status : undefined;
@@ -459,6 +460,7 @@ export const getOutcome = createServerFn({ method: "GET" })
   .validator((executionId: string) => executionId.trim().toLowerCase())
   .handler(async ({ data }) => {
     if (!/^0x[a-f0-9]{64}$/.test(data)) return { outcome: null as OutcomeRecord | null, agentName: "" };
+    await syncFirewallSafe();
     const outcome = await getOutcomeByExecution(data);
     if (!outcome) return { outcome: null as OutcomeRecord | null, agentName: "" };
     const agent = await getIndexedAgent(outcome.agentId);
@@ -469,6 +471,7 @@ export const getAgentOutcomesPage = createServerFn({ method: "GET" })
   .validator((input: { agentId: string; status?: string; offset?: number }) => input)
   .handler(async ({ data }) => {
     if (!/^[1-9]\d*$/.test(data.agentId)) return { agent: null, items: [] as OutcomeRecord[], total: 0, limit: 50, offset: 0 };
+    await syncFirewallSafe();
     const agent = await getIndexedAgent(data.agentId);
     if (!agent) return { agent: null, items: [] as OutcomeRecord[], total: 0, limit: 50, offset: 0 };
     const status: OutcomeStatus | undefined =
@@ -481,6 +484,7 @@ export const getAgentProofPage = createServerFn({ method: "GET" })
   .validator((input: { agentId: string; status?: string }) => input)
   .handler(async ({ data }) => {
     if (!/^[1-9]\d*$/.test(data.agentId)) return { agent: null, proofs: [] as ProofRecord[] };
+    await syncFirewallSafe();
     const agent = await getIndexedAgent(data.agentId);
     if (!agent) return { agent: null, proofs: [] as ProofRecord[] };
     const verifiedOnly = data.status === "verified";
@@ -499,6 +503,7 @@ export const listFirewalls = createServerFn({ method: "GET" }).handler(async () 
 });
 
 export const listProofs = createServerFn({ method: "GET" }).handler(async () => {
+  await syncFirewallSafe();
   await settlePendingProofs(1);
   const proofs = await listExecutionProofs(100);
   return {
@@ -512,7 +517,12 @@ export const listProofs = createServerFn({ method: "GET" }).handler(async () => 
 export const getProof = createServerFn({ method: "GET" })
   .validator((id: string) => id.trim().toLowerCase())
   .handler(async ({ data }) => {
-    const proof = await getExecutionProof(data);
+    // A cold serverless instance starts empty: index first, then settle this one proof (and pick
+    // up an existing anchor) so a direct link shows the same state on every instance.
+    await syncFirewallSafe();
+    const proof = /^0x[a-f0-9]{64}$/.test(data)
+      ? ((await verifyIndexedExecution(data).catch(() => null)) ?? (await getExecutionProof(data)))
+      : null;
     if (!proof) {
       return { proof: null as ProofRecord | null, detail: "This execution is not indexed." };
     }

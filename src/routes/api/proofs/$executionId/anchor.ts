@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requireUserId } from "@/lib/auth/verify.server";
+import { syncFirewallSafe } from "@/lib/chain/firewall.server";
 import { anchorVerifiedProof } from "@/lib/chain/proof.server";
 
 export const Route = createFileRoute("/api/proofs/$executionId/anchor")({
@@ -13,6 +14,7 @@ export const Route = createFileRoute("/api/proofs/$executionId/anchor")({
         } catch {
           return Response.json({ error: "Sign in is required to request an anchor." }, { status: 401 });
         }
+        await syncFirewallSafe();
         const result = await anchorVerifiedProof(params.executionId);
         const status = result.proof ? 200 : 404;
         return Response.json(
