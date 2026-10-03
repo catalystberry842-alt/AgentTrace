@@ -7,7 +7,7 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { buttonClass, EmptyState, ErrorNote, Mono, StatusText, TableSkeleton, TextInput } from "@/components/ui";
 import { formatAgentLabel, formatUtc, shortAddress } from "@/lib/format";
 
-const FILTERS = ["All", "Active", "Inactive"] as const;
+const FILTERS = ["Active", "All", "Inactive"] as const;
 type Filter = (typeof FILTERS)[number];
 const CAPABILITY_FILTERS = CAPABILITIES.filter((item) => item !== "Other");
 const google = GROK_PROVIDERS.find((provider) => provider.idp === "google");
@@ -18,7 +18,8 @@ export function Directory() {
   const [total, setTotal] = useState<number | null>(null);
   const [indexer, setIndexer] = useState<IndexerStatus | null>(null);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<Filter>("All");
+  // Deactivated identities stay on chain forever; list active ones unless asked.
+  const [filter, setFilter] = useState<Filter>("Active");
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [history, setHistory] = useState<HistoryFlag[]>([]);
   const [verifiedExecutions, setVerifiedExecutions] = useState(false);
@@ -62,6 +63,7 @@ export function Directory() {
     return true;
   });
   const noneIndexed = total === 0 && !query.trim();
+  const hiddenInactive = filter === "Active" ? (agents ?? []).filter((agent) => !agent.active).length : 0;
 
   return (
     <div>
@@ -217,7 +219,7 @@ export function Directory() {
                       </span>
                     </Field>
                     <Field label="Registered">
-                      <span className="text-sm text-muted">{formatUtc(agent.registeredAt)}</span>
+                      <span className="text-sm whitespace-nowrap text-muted">{formatUtc(agent.registeredAt)}</span>
                     </Field>
                   </span>
                 </Link>
@@ -225,6 +227,14 @@ export function Directory() {
             ))}
           </ul>
         </div>
+      ) : null}
+      {agents && hiddenInactive > 0 ? (
+        <p className="mt-4 text-sm text-muted">
+          {hiddenInactive} deactivated {hiddenInactive === 1 ? "agent is" : "agents are"} hidden.{" "}
+          <button type="button" className="text-fg underline-offset-4 hover:underline" onClick={() => setFilter("All")}>
+            Show all
+          </button>
+        </p>
       ) : null}
     </div>
   );

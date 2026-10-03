@@ -44,6 +44,11 @@
 }
 
 @layer base {
+  /* Fact rows lay out by the width of their list, not the viewport (see Fact in ui.tsx). */
+  dl {
+    container-type: inline-size;
+  }
+
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;

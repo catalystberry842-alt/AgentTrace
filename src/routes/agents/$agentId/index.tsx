@@ -363,7 +363,7 @@ function AgentProfile({ agent }: { agent: IndexedAgent }) {
       ) : (
         <div className="h-20 animate-pulse rounded-sm bg-subtle" aria-hidden />
       )}
-      <div className="mt-10 grid gap-10 md:grid-cols-3">
+      <div className="mt-10 grid gap-x-10 md:grid-cols-[1.3fr_1fr_1fr]">
         <div id="identity">
           <Section title="Identity">
           <dl>
@@ -372,7 +372,9 @@ function AgentProfile({ agent }: { agent: IndexedAgent }) {
             </Fact>
             <Fact label="Capabilities">{agent.capabilities.length ? agent.capabilities.join(" · ") : "None recorded."}</Fact>
             <Fact label="Network">Monad testnet</Fact>
-            <Fact label="Created">{formatUtc(agent.registeredAt)}</Fact>
+            <Fact label="Created">
+              <span className="whitespace-nowrap">{formatUtc(agent.registeredAt)}</span>
+            </Fact>
             {agent.txHash ? (
               <Fact label="Registration">
                 <TxValue hash={agent.txHash} copy />
@@ -395,7 +397,9 @@ function AgentProfile({ agent }: { agent: IndexedAgent }) {
             <dl>
               <Fact label="Executions">{reputation.verifiedExecutions} verified</Fact>
               <Fact label="Outcomes">{reputation.verifiedOutcomes} verified</Fact>
-              <Fact label="Last activity">{formatUtc(reputation.lastActivityAt)}</Fact>
+              <Fact label="Last activity">
+                <span className="whitespace-nowrap">{formatUtc(reputation.lastActivityAt)}</span>
+              </Fact>
             </dl>
           ) : (
             <div className="h-16 animate-pulse rounded-sm bg-subtle" aria-hidden />

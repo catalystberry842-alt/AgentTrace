@@ -224,7 +224,7 @@ export function Section({ title, children, id }: { title: string; children: Reac
 
 export function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid gap-1 border-b border-border-subtle py-3 last:border-b-0 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-6">
+    <div className="grid gap-1 border-b border-border-subtle py-3 last:border-b-0 @md:grid-cols-[10rem_minmax(0,1fr)] @md:gap-6">
       <dt className="type-caption text-faint">{label}</dt>
       <dd className="min-w-0 text-sm text-fg">{children}</dd>
     </div>

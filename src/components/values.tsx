@@ -46,11 +46,13 @@ export function AddressValue({
   if (!value) return "—";
   const mobile = /^0x[a-fA-F0-9]{40}$/.test(value) ? `${value.slice(0, 4)}…${value.slice(-4)}` : value;
   return (
-    <span className="inline-flex max-w-full flex-wrap items-center gap-1">
-      <SplitMono desktop={shortAddress(value)} mobile={mobile} title={value} />
+    <span className="inline-flex max-w-full items-center gap-2 whitespace-nowrap">
+      <span className="min-w-0 truncate">
+        <SplitMono desktop={shortAddress(value)} mobile={mobile} title={value} />
+      </span>
       {copy ? <CopyButton value={value} label="address" /> : null}
       {explorer && href ? (
-        <a href={href} className="inline-flex h-11 items-center px-1 text-xs text-muted hover:text-fg" rel="noreferrer">
+        <a href={href} className="inline-flex h-11 shrink-0 items-center px-1 text-xs text-muted hover:text-fg" rel="noreferrer">
           Explorer
         </a>
       ) : null}
@@ -64,9 +66,9 @@ export function TxValue({ hash, copy = false }: { hash: string | null | undefine
   const desktop = shortHash(hash);
   const mobile = /^0x[a-fA-F0-9]{64}$/.test(hash) ? `${hash.slice(0, 6)}…${hash.slice(-4)}` : desktop;
   return (
-    <span className="inline-flex max-w-full flex-wrap items-center gap-1">
+    <span className="inline-flex max-w-full items-center gap-2 whitespace-nowrap">
       {href ? (
-        <a href={href} className="underline-offset-4 hover:underline" rel="noreferrer">
+        <a href={href} className="min-w-0 truncate underline-offset-4 hover:underline" rel="noreferrer">
           <SplitMono desktop={desktop} mobile={mobile} title={hash} />
         </a>
       ) : (
