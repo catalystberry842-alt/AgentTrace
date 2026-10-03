@@ -519,14 +519,34 @@ export const getProof = createServerFn({ method: "GET" })
     return { proof, detail: "" };
   });
 
+/**
+ * Execution id, optionally with the transaction hash that emitted it. The hash only lets this
+ * server instance index the receipt first; the proof is still checked from chain data.
+ */
+function parseExecutionRef(input: string | { executionId: string; txHash?: string }) {
+  const raw = typeof input === "string" ? { executionId: input } : input;
+  const id = String(raw?.executionId ?? "").trim().toLowerCase();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(id)) throw new Error("Invalid execution id.");
+  const txHash = typeof raw.txHash === "string" ? raw.txHash.trim().toLowerCase() : null;
+  if (txHash && !/^0x[a-f0-9]{64}$/.test(txHash)) throw new Error("Invalid transaction hash.");
+  return { id, txHash: txHash as `0x${string}` | null };
+}
+
+async function ensureExecutionIndexed(id: string, txHash: `0x${string}` | null) {
+  if (!txHash) return;
+  const sql = await getSql();
+  const found = await sql<{ execution_id: string }>`
+    select execution_id from firewall_actions
+    where chain_id = ${MONAD_TESTNET.chainId} and execution_id = ${id}
+  `;
+  if (!found.length) await ingestFirewallReceipt(sql, txHash);
+}
+
 export const verifyProof = createServerFn({ method: "POST" })
-  .validator((executionId: string) => {
-    const id = executionId.trim().toLowerCase();
-    if (!/^0x[a-fA-F0-9]{64}$/.test(id)) throw new Error("Invalid execution id.");
-    return id;
-  })
+  .validator(parseExecutionRef)
   .handler(async ({ data }) => {
-    const proof = await verifyIndexedExecution(data, true);
+    await ensureExecutionIndexed(data.id, data.txHash);
+    const proof = await verifyIndexedExecution(data.id, true);
     if (!proof) throw new Error("No AgentAction is indexed for this execution. A transaction hash is not a proof.");
     return { proof };
   });
@@ -797,13 +817,10 @@ export const readDemoState = createServerFn({ method: "GET" })
 
 export const verifyDemoDeposit = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((executionId: string) => {
-    const id = executionId.trim().toLowerCase();
-    if (!/^0x[a-fA-F0-9]{64}$/.test(id)) throw new Error("Invalid execution id.");
-    return id;
-  })
+  .validator(parseExecutionRef)
   .handler(async ({ data }) => {
-    const response = await verifyDemoDepositOutcome(data);
+    await ensureExecutionIndexed(data.id, data.txHash);
+    const response = await verifyDemoDepositOutcome(data.id);
     const body = (await response.json()) as {
       error?: { message?: string };
       status?: string;

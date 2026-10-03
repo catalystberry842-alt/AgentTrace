@@ -802,7 +802,7 @@ export async function ingestFirewallReceipt(
 ): Promise<
   | { state: "pending" }
   | { state: "reverted"; error: string }
-  | { state: "indexed"; firewallIds: string[] }
+  | { state: "indexed"; firewallIds: string[]; executionIds: string[] }
   | { state: "empty"; error: string }
 > {
   const firewall = configuredFirewall();
@@ -832,6 +832,7 @@ export async function ingestFirewallReceipt(
     };
   }
   const ids = new Set<string>();
+  const executions = new Set<string>();
   for (const log of logs) {
     try {
       await applyFirewallLog(sql, firewall, log);
@@ -844,11 +845,15 @@ export async function ingestFirewallReceipt(
     }
     try {
       const decoded = decodeEventLog({ abi: agentFirewallAbi, data: log.data, topics: log.topics });
-      const firewallId = asId((decoded.args as { firewallId?: unknown }).firewallId);
+      const args = decoded.args as { firewallId?: unknown; executionId?: unknown };
+      const firewallId = asId(args.firewallId);
       if (firewallId) ids.add(firewallId);
+      if (decoded.eventName === "AgentAction" && typeof args.executionId === "string") {
+        executions.add(args.executionId.toLowerCase());
+      }
     } catch {
       // already skipped inside apply
     }
   }
-  return { state: "indexed", firewallIds: [...ids] };
+  return { state: "indexed", firewallIds: [...ids], executionIds: [...executions] };
 }

@@ -4,7 +4,6 @@ import { encodeFunctionData } from "viem";
 import {
   confirmFirewallTx,
   getChainStatus,
-  getFirewall,
   readDemoState,
   refreshFirewallIntent,
   refreshIntent,
@@ -368,10 +367,12 @@ function DemoPage() {
       setSaved((current) => ({ ...current, txHash: hash }));
       setPhase("Waiting for confirmation");
       let indexed = false;
+      let executionId: string | null = null;
       for (let attempt = 0; attempt < 10; attempt += 1) {
         const result = await confirmFirewallTx({ data: { txHash: hash, firewallId: saved.firewallId } });
         if (result.state === "indexed") {
           indexed = true;
+          executionId = result.executionIds[0] ?? null;
           break;
         }
         if (result.state === "reverted" || result.state === "empty") {
@@ -382,12 +383,11 @@ function DemoPage() {
       }
       if (!indexed) throw new Error("The transaction is confirmed or still pending. Indexing did not finish. Nothing was marked verified.");
       setPhase("Indexing action");
-      const fresh = await getFirewall({ data: saved.firewallId });
-      const action = fresh.actions.find((row) => row.txHash.toLowerCase() === hash?.toLowerCase());
-      if (!action) throw new Error("Transaction confirmed. Waiting for AgentTrace indexing...");
+      if (!executionId) throw new Error("The transaction confirmed but it did not emit an AgentAction.");
+      const action = { executionId, txHash: hash };
       setSaved((current) => ({ ...current, executionId: action.executionId, txHash: hash }));
       setPhase("Verifying execution");
-      let proof = await verifyProof({ data: action.executionId });
+      let proof = await verifyProof({ data: action });
       for (
         let attempt = 0;
         attempt < 4 &&
@@ -398,7 +398,7 @@ function DemoPage() {
       ) {
         setPhase("Execution detected. Verifying transaction evidence...");
         await sleep(2000);
-        proof = await verifyProof({ data: action.executionId });
+        proof = await verifyProof({ data: action });
       }
       setSaved((current) => ({ ...current, proofStatus: proof.proof.verificationStatus }));
       if (proof.proof.verificationStatus !== "receipt_verified") {
@@ -410,7 +410,7 @@ function DemoPage() {
       }
       setPhase("Proof created");
       setPhase("Checking outcome...");
-      const outcome = await verifyDemoDeposit({ data: action.executionId });
+      const outcome = await verifyDemoDeposit({ data: action });
       setSaved((current) => ({
         ...current,
         outcomeStatus: outcome.status,

@@ -369,8 +369,10 @@ export function FirewallControls({ firewall, onReload }: { firewall: FirewallRec
       }
       setTxPhase("Confirmed");
       toast.success("Transaction confirmed");
-      const fresh = await getFirewall({ data: firewall.id });
-      const action = fresh.actions.find((row) => row.txHash.toLowerCase() === hash.toLowerCase());
+      // The confirming request already decoded the AgentAction; another server instance may
+      // not have indexed it yet, so do not depend on a second lookup.
+      const executionId = result.executionIds[0];
+      const action = executionId ? { executionId, txHash: hash } : null;
       await onReload();
       if (!action) {
         setPhase(null);
@@ -383,7 +385,7 @@ export function FirewallControls({ firewall, onReload }: { firewall: FirewallRec
         requestAnimationFrame(() => resolve(undefined));
       });
       setPhase("Verifying execution");
-      const verified = await verifyProof({ data: action.executionId });
+      const verified = await verifyProof({ data: action });
       await onReload();
       if (verified.proof.anchored) setPhase("Proof anchored");
       else if (verified.proof.verificationStatus === "receipt_verified") setPhase("Execution verified");
