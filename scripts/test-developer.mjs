@@ -37,6 +37,10 @@ const received = [];
 let server;
 
 try {
+  // These checks cover the "not deployed" paths with a local EVM. The committed record now holds
+  // the live Monad testnet deployment, so blank it in this process only.
+  const { deployment: record } = await vite.ssrLoadModule("/src/lib/chain/deployment.ts");
+  for (const key of Object.keys(record)) if (key !== "chainId") record[key] = null;
   const keys = await vite.ssrLoadModule("/src/lib/developer/keys.server.ts");
   const v1 = await vite.ssrLoadModule("/src/lib/developer/v1.server.ts");
   const guard = await vite.ssrLoadModule("/src/lib/developer/guard.server.ts");

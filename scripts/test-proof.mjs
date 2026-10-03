@@ -270,6 +270,10 @@ function cloneEvidence(input) {
 
 const vite = await createServer({ root, server: { middlewareMode: true }, appType: "custom", logLevel: "error" });
 try {
+  // These checks cover the "not deployed" paths with a local EVM. The committed record now holds
+  // the live Monad testnet deployment, so blank it in this process only.
+  const { deployment: record } = await vite.ssrLoadModule("/src/lib/chain/deployment.ts");
+  for (const key of Object.keys(record)) if (key !== "chainId") record[key] = null;
   const assessMod = await vite.ssrLoadModule("/src/lib/chain/proof-assess.ts");
   const hashMod = await vite.ssrLoadModule("/src/lib/chain/proof-hash.ts");
   const proofMod = await vite.ssrLoadModule("/src/lib/chain/proof.server.ts");
