@@ -46,6 +46,7 @@ type State = {
   lastFlushAt: number;
   dirty: boolean;
   requests: OutcomeRequest[];
+  requestsReadAt: number;
 };
 const slot = globalThis as typeof globalThis & { __agenttraceChainCache?: State };
 function state(): State {
@@ -56,6 +57,7 @@ function state(): State {
     lastFlushAt: 0,
     dirty: false,
     requests: [],
+    requestsReadAt: 0,
   };
   return slot.__agenttraceChainCache;
 }
@@ -232,11 +234,15 @@ export async function recordOutcomeRequest(request: OutcomeRequest): Promise<voi
   if (s.requests.length > before) await flush();
 }
 
-/** Outcome checks requested on any instance, as of this process's first cache read. */
+/** Outcome checks requested on any instance (refreshed from the blob at most once a minute). */
 export async function cachedOutcomeRequests(): Promise<OutcomeRequest[]> {
   if (!chainCacheEnabled()) return [];
   const s = state();
-  s.doc ??= readRemote();
-  const doc = await s.doc;
-  return mergeRequests(doc?.outcomeRequests, s.requests);
+  // Other instances add requests over time; re-read the blob at most once a minute.
+  if (Date.now() - s.requestsReadAt >= 60_000) {
+    s.requestsReadAt = Date.now();
+    const remote = await readRemote();
+    s.requests = mergeRequests(remote?.outcomeRequests, s.requests);
+  }
+  return s.requests;
 }
