@@ -553,12 +553,12 @@ export const verifyProof = createServerFn({ method: "POST" })
 
 export const anchorProof = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((executionId: string) => {
-    const id = executionId.trim().toLowerCase();
-    if (!/^0x[a-fA-F0-9]{64}$/.test(id)) throw new Error("Invalid execution id.");
-    return id;
-  })
-  .handler(async ({ data }) => anchorVerifiedProof(data));
+  .validator(parseExecutionRef)
+  .handler(async ({ data }) => {
+    // A fresh serverless instance may not have indexed this execution yet.
+    await ensureExecutionIndexed(data.id, data.txHash);
+    return anchorVerifiedProof(data.id);
+  });
 
 export const getFirewall = createServerFn({ method: "GET" })
   .validator((id: string) => id)

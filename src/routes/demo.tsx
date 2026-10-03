@@ -425,7 +425,7 @@ function DemoPage() {
       setPhase("Outcome verified. Anchoring proof onchain...");
       // Anchoring is a server-side verifier transaction. It never undoes a verified outcome.
       try {
-        const anchored = await anchorProof({ data: action.executionId });
+        const anchored = await anchorProof({ data: action });
         setSaved((current) => ({ ...current, anchorTxHash: anchored.anchored ? anchored.txHash ?? "anchored" : null }));
         setPhase(anchored.anchored ? "Outcome verified. Proof anchored onchain." : "Outcome verified");
       } catch {

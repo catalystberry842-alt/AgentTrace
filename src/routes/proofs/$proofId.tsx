@@ -124,7 +124,7 @@ function Record({
     setAnchorNote(null);
     onPhase("Anchoring proof");
     try {
-      const result = await anchorProof({ data: proof.executionId });
+      const result = await anchorProof({ data: { executionId: proof.executionId, txHash: proof.txHash } });
       if (result.proof) onChange(result.proof);
       setAnchorNote(result.anchored ? "Proof anchored." : result.reason);
     } catch (err) {

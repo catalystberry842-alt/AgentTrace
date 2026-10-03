@@ -607,7 +607,11 @@ async function restoreAnchor(proof: ProofRecord, force = false): Promise<boolean
 export async function anchorVerifiedProof(
   executionId: string,
 ): Promise<{ anchored: boolean; reason: string; txHash: string | null; proof: ProofRecord | null }> {
-  const proof = await getExecutionProof(executionId);
+  let proof = await getExecutionProof(executionId);
+  if (proof && proof.verificationStatus !== "receipt_verified") {
+    // Another instance may have verified it; this one re-checks the receipt before anchoring.
+    proof = (await verifyIndexedExecution(proof.executionId, true)) ?? proof;
+  }
   if (!proof) {
     return { anchored: false, reason: "No AgentAction is indexed for this execution.", txHash: null, proof: null };
   }
