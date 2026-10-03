@@ -25,9 +25,11 @@ export async function scanLogs(opts: {
   saveCursor: (scannedTo: number) => Promise<void>;
   /** Every log read, in order, including ones already in the database. */
   seen?: Log[];
+  /** Override the per-call time budget (used when a request must catch up to a block). */
+  budgetMs?: number;
 }): Promise<number> {
   const range = logBlockRange();
-  const deadline = Date.now() + scanBudgetMs();
+  const deadline = Date.now() + (opts.budgetMs ?? scanBudgetMs());
   let from = opts.from;
   let scannedTo = opts.from - 1;
   while (from <= opts.latest && Date.now() < deadline) {

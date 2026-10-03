@@ -462,7 +462,7 @@ async function mutate(
   }
 }
 
-export async function syncFirewall(force = false): Promise<IndexerStatus> {
+export async function syncFirewall(force = false, budgetMs?: number): Promise<IndexerStatus> {
   const firewall = configuredFirewall();
   if (!firewall) {
     return {
@@ -515,6 +515,7 @@ export async function syncFirewall(force = false): Promise<IndexerStatus> {
     const scannedTo = await scanLogs({
       client,
       seen,
+      budgetMs,
       address: firewall,
       from,
       latest,
@@ -544,6 +545,15 @@ export async function syncFirewall(force = false): Promise<IndexerStatus> {
     state.inflight = undefined;
   });
   return state.inflight;
+}
+
+/** Scan firewall history until `target` is covered, with a longer budget than a page sync. */
+async function catchUpFirewall(target: number): Promise<void> {
+  const deadline = Date.now() + 25_000;
+  for (;;) {
+    const status = await syncFirewall(true, 8_000);
+    if (status.status !== "ok" || status.lastScannedBlock >= target || Date.now() > deadline) return;
+  }
 }
 
 export async function syncFirewallSafe(): Promise<IndexerStatus> {
@@ -823,7 +833,15 @@ export async function ingestFirewallReceipt(
   }
   const ids = new Set<string>();
   for (const log of logs) {
-    await applyFirewallLog(sql, firewall, log);
+    try {
+      await applyFirewallLog(sql, firewall, log);
+    } catch (err) {
+      // This instance has not indexed the firewall yet (serverless instances do not share a
+      // database). Catch the indexer up to the block before this receipt, then apply again.
+      if (!(err instanceof Error && /unknown firewall/.test(err.message))) throw err;
+      await catchUpFirewall(Number(receipt.blockNumber) - 1);
+      await applyFirewallLog(sql, firewall, log);
+    }
     try {
       const decoded = decodeEventLog({ abi: agentFirewallAbi, data: log.data, topics: log.topics });
       const firewallId = asId((decoded.args as { firewallId?: unknown }).firewallId);

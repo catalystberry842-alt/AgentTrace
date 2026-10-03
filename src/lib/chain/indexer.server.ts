@@ -224,7 +224,7 @@ export async function applyRegistryLog(sql: Sql, registry: string, log: Log): Pr
   }
 }
 
-export async function syncRegistry(force = false): Promise<IndexerStatus> {
+export async function syncRegistry(force = false, budgetMs?: number): Promise<IndexerStatus> {
   const registry = configuredRegistry();
   if (!registry) {
     return {
@@ -267,6 +267,7 @@ export async function syncRegistry(force = false): Promise<IndexerStatus> {
     const scannedTo = await scanLogs({
       client,
       seen,
+      budgetMs,
       address: registry,
       from,
       latest,
@@ -468,7 +469,19 @@ export async function confirmRegistrationReceipt(
     return { state: "failed", error: "Transaction reverted on Monad. The agent was not registered." };
   }
   for (const log of receipt.logs) {
-    await applyRegistryLog(sql, registry, log);
+    try {
+      await applyRegistryLog(sql, registry, log);
+    } catch (err) {
+      // Another serverless instance indexed this agent; catch up to the block before the receipt.
+      if (!(err instanceof Error && /unknown agent/.test(err.message))) throw err;
+      const target = Number(receipt.blockNumber) - 1;
+      const deadline = Date.now() + 25_000;
+      for (;;) {
+        const status = await syncRegistry(true, 8_000);
+        if (status.status !== "ok" || status.lastScannedBlock >= target || Date.now() > deadline) break;
+      }
+      await applyRegistryLog(sql, registry, log);
+    }
   }
   const rows = await sql<{ agent_id: string; owner: string }>`
     select agent_id, owner from indexed_agents
