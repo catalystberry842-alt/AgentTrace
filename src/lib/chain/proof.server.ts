@@ -2,17 +2,38 @@ import { createPublicClient, createWalletClient, decodeEventLog, http, type Hex 
 import { privateKeyToAccount } from "viem/accounts";
 import { defineChain } from "viem";
 import { getSql, type Sql } from "@/lib/db";
-import { agentProofAbi } from "@/lib/chain/abi";
+import { agentProofAbi, agentRegistryAbi } from "@/lib/chain/abi";
 import { deployment } from "@/lib/chain/deployment";
 import { readAddress } from "@/lib/chain/addresses.server";
 import { configuredFirewall } from "@/lib/chain/firewall.server";
-import { getPublicClient } from "@/lib/chain/indexer.server";
+import { configuredRegistry, getPublicClient } from "@/lib/chain/indexer.server";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { monadRpcUrl, monadTransport } from "@/lib/chain/rpc.server";
 import { assessExecution, VERIFICATION_METHOD, type AssessedLog } from "@/lib/chain/proof-assess";
 import { computeProofHash } from "@/lib/chain/proof-hash";
 import { publishDeveloperEvent } from "@/lib/developer/webhooks.server";
 import type { ProofRecord, ProofStatus, VerificationCheck } from "@/lib/agents/types";
+
+/**
+ * Whether the agent exists. The local index answers first; when it has not seen the agent yet
+ * (a fresh serverless instance), ask AgentRegistry on chain instead of failing the check.
+ * Agent ids are never reused or deleted, so a true answer now means the id was registered.
+ */
+async function agentExistsOnChain(agentId: string, indexed: boolean): Promise<boolean> {
+  if (indexed) return true;
+  const registry = configuredRegistry();
+  if (!registry || !/^\d+$/.test(agentId)) return false;
+  try {
+    return await getPublicClient().readContract({
+      address: registry as `0x${string}`,
+      abi: agentRegistryAbi,
+      functionName: "agentExists",
+      args: [BigInt(agentId)],
+    });
+  } catch {
+    return false;
+  }
+}
 
 function monadChain() {
   return defineChain({
@@ -316,7 +337,7 @@ export async function verifyIndexedExecution(executionId: string, force = false)
         txHash: action.tx_hash,
         blockNumber: Number(action.block_number),
       },
-      agentExists: action.agent_exists,
+      agentExists: await agentExistsOnChain(action.agent_id, action.agent_exists),
       firewallAgentId: action.firewall_agent_id,
       firewallContract: firewall,
       tx: tx
@@ -479,7 +500,7 @@ async function receiptStillMatches(proof: ProofRecord): Promise<string | null> {
         txHash: action.tx_hash,
         blockNumber: Number(action.block_number),
       },
-      agentExists: action.agent_exists,
+      agentExists: await agentExistsOnChain(action.agent_id, action.agent_exists),
       firewallAgentId: action.firewall_agent_id,
       firewallContract: firewall,
       tx: { hash: tx.hash, from: tx.from, to: tx.to, input: tx.input, value: tx.value },
