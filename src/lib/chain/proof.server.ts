@@ -419,11 +419,13 @@ export async function settlePendingProofs(limit = 1): Promise<void> {
       and verification_status in ('executed', 'requested', 'temporary_error')
       and attempt_count < 12
       and (last_attempt_at is null or last_attempt_at < now() - interval '20 seconds')
-    order by created_at asc
+    order by block_number desc
     limit ${limit}
   `;
-  for (const row of rows) {
-    await verifyIndexedExecution(row.execution_id, false);
+  // Newest first: on a fresh serverless instance replayed executions all start unverified, and the
+  // recent ones are the ones being looked at. A few run in parallel to stay within RPC limits.
+  for (let i = 0; i < rows.length; i += 3) {
+    await Promise.all(rows.slice(i, i + 3).map((row) => verifyIndexedExecution(row.execution_id, false)));
   }
 }
 

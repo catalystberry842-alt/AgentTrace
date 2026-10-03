@@ -563,7 +563,7 @@ export async function syncFirewallSafe(): Promise<IndexerStatus> {
     // Executions replayed into a fresh database start as "executed". Re-run the receipt check for a
     // few of them so verified status does not depend on which server instance answered.
     const { settlePendingProofs } = await import("@/lib/chain/proof.server");
-    await settlePendingProofs(3).catch(() => undefined);
+    await settlePendingProofs(6).catch(() => undefined);
     return status;
   } catch (err) {
     const result: IndexerStatus = {
