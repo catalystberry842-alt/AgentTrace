@@ -6,7 +6,7 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
   return (
     <button
       type="button"
-      className="h-11 shrink-0 px-1 text-xs text-muted hover:text-fg"
+      className="h-11 shrink-0 px-1 text-xs text-muted hover:text-fg sm:h-auto"
       aria-label={done ? `${label} copied` : `Copy ${label}`}
       onClick={() => {
         void navigator.clipboard.writeText(value).then(() => {
@@ -52,7 +52,7 @@ export function AddressValue({
       </span>
       {copy ? <CopyButton value={value} label="address" /> : null}
       {explorer && href ? (
-        <a href={href} className="inline-flex h-11 shrink-0 items-center px-1 text-xs text-muted hover:text-fg" rel="noreferrer">
+        <a href={href} className="inline-flex h-11 shrink-0 items-center px-1 text-xs text-muted hover:text-fg sm:h-auto" rel="noreferrer">
           Explorer
         </a>
       ) : null}
