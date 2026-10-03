@@ -71,6 +71,8 @@ Events: `ExecutionProofAnchored`, `VerifierUpdated`.
 
 Authorization: the constructor sets `owner` to the deployer and `verifier` to the address passed in. Anchors cannot be edited. The same execution id or proof hash cannot be anchored twice.
 
+On the testnet deployment the verifier is a dedicated server wallet, [`0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85`](https://testnet.monadvision.com/address/0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85), set with `setVerifier` in [`0x9f239ab5…`](https://testnet.monadvision.com/tx/0x9f239ab50f69b909d7ff07d3ba4cedb6e92a81cf092f439acda90b03dd573208). Example anchor: [`0x577824ab…`](https://testnet.monadvision.com/tx/0x577824ab9bef8a84f9b2b0063d8bd580986e456d10a7837861483f9bc26737c4) (agent #006).
+
 ### Proof hash
 
 The verifier and this contract use the same encoding. Field order is fixed. It does not use JSON.

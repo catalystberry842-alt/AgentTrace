@@ -51,7 +51,7 @@ Implemented in this repository:
 - Firewall creation, executor, targets, functions, value policy, pause, unpause, and deactivation
 - Execution through `AgentFirewall.execute`, with revert of the whole transaction if the target reverts
 - Receipt-based proof verification and deterministic proof hashing
-- Optional onchain proof anchoring in `AgentProof` when a verifier key is configured
+- Onchain proof anchoring in `AgentProof`: after a proof is receipt-verified, the server verifier commits its proof hash onchain (live on the hosted app)
 - Outcome verification for an expected event, and for Demo Protocol `deposits` or `swapped` when the onchain value matches
 - Indexed agent directory, passport, activity, proofs, and outcomes
 - Developer API, hashed API keys, rate limits, and HMAC-signed webhooks
@@ -83,7 +83,7 @@ Not implemented:
 | AgentProof | Immutable proof-hash anchors | [`0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e`](https://testnet.monadvision.com/address/0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e) | 67788400 | [`0x4e017247…`](https://testnet.monadvision.com/tx/0x4e0172478ce7dde026c13d6c020cd5788e4ba64a9cf42d38554c02643b2d95b4) |
 | DemoProtocol | Deposit, swap, and withdraw demo target | [`0x1664be58ee54af91c756428f466bad6e4f9911c3`](https://testnet.monadvision.com/address/0x1664be58ee54af91c756428f466bad6e4f9911c3) | 67788404 | [`0xd9f5fad6…`](https://testnet.monadvision.com/tx/0xd9f5fad6e0043f9980e084643ea60dc47c6572139072de9f6ded64c20f38bdae) |
 
-Deployed on 3 October 2026 by `0x4f3f999B60750cEf97D7D56c75f30F050A583D53` with `npm run deploy:testnet`. `AgentFirewall.agentRegistry()` returns the registry above. The AgentProof verifier is the deployer address; the owner can change it with `setVerifier`. Addresses stay null until a confirmed transaction exists. Environment variables may override the record. See [docs/contracts.md](docs/contracts.md).
+Deployed on 3 October 2026 by `0x4f3f999B60750cEf97D7D56c75f30F050A583D53` with `npm run deploy:testnet`. `AgentFirewall.agentRegistry()` returns the registry above. The AgentProof verifier is a dedicated server wallet, [`0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85`](https://testnet.monadvision.com/address/0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85), set by the owner with `setVerifier` ([`0x9f239ab5…`](https://testnet.monadvision.com/tx/0x9f239ab50f69b909d7ff07d3ba4cedb6e92a81cf092f439acda90b03dd573208)). The hosted app holds its key as a sensitive server environment variable and anchors each verified proof hash, for example agent #006 ([`0x577824ab…`](https://testnet.monadvision.com/tx/0x577824ab9bef8a84f9b2b0063d8bd580986e456d10a7837861483f9bc26737c4)). Addresses stay null until a confirmed transaction exists. Environment variables may override the record. See [docs/contracts.md](docs/contracts.md).
 
 ## Deploying the contracts to Monad testnet
 
@@ -206,8 +206,6 @@ From the live deployment on Monad testnet. Agent #006 is a complete example: ide
 
 ## Roadmap
 
-- Deploy the four contracts to Monad testnet (`npm run deploy:testnet`) and commit the confirmed addresses
-- Configure the proof-anchor verifier
 - Let a configured executor submit `execute` from the API without weakening firewall checks
 
 ## Documentation

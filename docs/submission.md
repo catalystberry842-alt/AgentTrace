@@ -12,14 +12,14 @@ An agent id is created in `AgentRegistry`. What that agent may call is stored in
 
 - Live app: https://agenttrace-plum.vercel.app
 - Demo video (82 s, real Monad testnet transactions): [docs/demo.mp4](demo.mp4)
-- A complete live example: agent [#006](https://agenttrace-plum.vercel.app/agents/6), firewall [#004](https://agenttrace-plum.vercel.app/firewalls/4), execution proof [0x3242aead…](https://agenttrace-plum.vercel.app/proofs/0x3242aeadc1ae0b511746852d623e71db91e3a49dbbe27662a886d65260c204df), and outcome [Deposited 100](https://agenttrace-plum.vercel.app/outcomes/0x3242aeadc1ae0b511746852d623e71db91e3a49dbbe27662a886d65260c204df); deposit transaction [0x6fbbd950…](https://testnet.monadvision.com/tx/0x6fbbd95042890cc346043ec2a79bb070929588580f49b197a4408cef47905c58)
-- `/demo`: identity → firewall → allowed deposit → proof → outcome → blocked withdraw. Running it needs a browser wallet on Monad testnet with a little testnet MON (under 0.1 MON for the five transactions); the withdraw is rejected by the firewall in simulation, so no transaction is sent for it
+- A complete live example: agent [#006](https://agenttrace-plum.vercel.app/agents/6), firewall [#004](https://agenttrace-plum.vercel.app/firewalls/4), execution proof [0x3242aead…](https://agenttrace-plum.vercel.app/proofs/0x3242aeadc1ae0b511746852d623e71db91e3a49dbbe27662a886d65260c204df) (anchored onchain in [`0x577824ab…`](https://testnet.monadvision.com/tx/0x577824ab9bef8a84f9b2b0063d8bd580986e456d10a7837861483f9bc26737c4)), and outcome [Deposited 100](https://agenttrace-plum.vercel.app/outcomes/0x3242aeadc1ae0b511746852d623e71db91e3a49dbbe27662a886d65260c204df); deposit transaction [0x6fbbd950…](https://testnet.monadvision.com/tx/0x6fbbd95042890cc346043ec2a79bb070929588580f49b197a4408cef47905c58)
+- `/demo`: identity → firewall → allowed deposit → proof → outcome → onchain anchor → blocked withdraw. Running it needs a browser wallet on Monad testnet with a little testnet MON (under 0.1 MON for the five transactions); the withdraw is rejected by the firewall in simulation, so no transaction is sent for it
 - Passport, firewall, proof, and outcome pages, which cite indexed chain data and link to the Monad explorer
 - `docs/contracts.md` for the proof hash
 - `npm run test:contracts` for local EVM checks of the registry, firewall, proof, demo, developer API, and reputation logic
 - Screenshots: [docs/screenshots](screenshots)
 
-Earlier test runs registered agents #001–#005, #007, and #008 from the same wallet. Onchain history cannot be deleted, so they were deactivated with `AgentRegistry.deactivateAgent`; the agents list hides deactivated agents by default and shows them under All or Inactive.
+Earlier test runs registered agents #001–#005 and #007–#011 from the same wallet. Onchain history cannot be deleted, so they were deactivated with `AgentRegistry.deactivateAgent`; the agents list hides deactivated agents by default and shows them under All or Inactive.
 
 ## Deployment
 
@@ -34,7 +34,12 @@ Contracts on Monad testnet (chain id 10143), deployed 3 October 2026:
 | AgentProof | Immutable proof-hash anchors | [`0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e`](https://testnet.monadvision.com/address/0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e) | 67788400 | [`0x4e017247…`](https://testnet.monadvision.com/tx/0x4e0172478ce7dde026c13d6c020cd5788e4ba64a9cf42d38554c02643b2d95b4) |
 | DemoProtocol | Deposit, swap, and withdraw demo target | [`0x1664be58ee54af91c756428f466bad6e4f9911c3`](https://testnet.monadvision.com/address/0x1664be58ee54af91c756428f466bad6e4f9911c3) | 67788404 | [`0xd9f5fad6…`](https://testnet.monadvision.com/tx/0xd9f5fad6e0043f9980e084643ea60dc47c6572139072de9f6ded64c20f38bdae) |
 
-`AGENT_PROOF_VERIFIER_PRIVATE_KEY` is not set on the hosted app, so proofs are verified from receipts and stored with their proof hash, but not anchored onchain in `AgentProof`.
+Proof anchoring is on. The AgentProof verifier is a dedicated server wallet, [`0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85`](https://testnet.monadvision.com/address/0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85), set by the contract owner with `setVerifier` ([`0x9f239ab5…`](https://testnet.monadvision.com/tx/0x9f239ab50f69b909d7ff07d3ba4cedb6e92a81cf092f439acda90b03dd573208)). After a proof is receipt-verified, the hosted app sends `anchorProof` with its proof hash, and `/demo` does this automatically after the outcome verifies. Anchors cannot be edited or repeated. Two live examples:
+
+- Agent #006 showcase execution: anchor [`0x577824ab…`](https://testnet.monadvision.com/tx/0x577824ab9bef8a84f9b2b0063d8bd580986e456d10a7837861483f9bc26737c4)
+- A `/demo` run on the live site (agent #011, execution `0x345347b7…`): anchor [`0x466a2c1e…`](https://testnet.monadvision.com/tx/0x466a2c1e891a392991fbeb2ea4135ba0a32aacbde3f5cd28fec5dc43e6749949), sent automatically by the demo flow
+
+`AgentProof.isAnchored(executionId)` returns true for both. `getAnchor` returns the proof hash, agent id, firewall id, execution transaction, and the verifier address.
 
 ## Judge questions
 

@@ -55,7 +55,7 @@ Derived rows can be rebuilt by scanning those logs again.
 
 A temporary RPC failure is `temporary_error`, not a failed proof and not a verified proof.
 
-The proof hash is documented in [contracts.md](contracts.md). Anchoring sends that hash to `AgentProof` only when the verifier key and proof contract are configured. A mismatch does not get anchored.
+The proof hash is documented in [contracts.md](contracts.md). Anchoring sends that hash to `AgentProof` only when the verifier key and proof contract are configured (both are on the hosted app). A mismatch does not get anchored. Each anchor event is also kept in the private chain cache, so another serverless instance shows the anchor transaction; if the cache lacks it, the server reads `AgentProof.isAnchored` and `getAnchor` before ever sending a second anchor.
 
 ## Outcome verification
 
