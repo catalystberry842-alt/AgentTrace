@@ -368,11 +368,16 @@ function AgentProfile({ agent }: { agent: IndexedAgent }) {
           <Section title="Identity">
           <dl>
             <Fact label="Owner">
-              <AddressValue value={agent.owner} copy />
+              <AddressValue value={agent.owner} copy explorer />
             </Fact>
             <Fact label="Capabilities">{agent.capabilities.length ? agent.capabilities.join(" · ") : "None recorded."}</Fact>
             <Fact label="Network">Monad testnet</Fact>
             <Fact label="Created">{formatUtc(agent.registeredAt)}</Fact>
+            {agent.txHash ? (
+              <Fact label="Registration">
+                <TxValue hash={agent.txHash} copy />
+              </Fact>
+            ) : null}
           </dl>
         </Section>
         </div>

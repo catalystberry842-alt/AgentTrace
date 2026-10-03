@@ -7,7 +7,7 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Shell } from "@/components/shell";
 import { AddressInput, AmountInput, Button, ChainError, Checkbox, CodeInput, ConfirmDialog, ErrorNote, Fact, Field, Mono, SkeletonLines, StatusText, TextInput } from "@/components/ui";
 import { AddressValue, CopyButton, TxValue } from "@/components/values";
-import { formatAgentId, formatDuration, formatWei, proofStatusLabel, statusTone } from "@/lib/format";
+import { addressUrl, formatAgentId, formatDuration, formatWei, proofStatusLabel, statusTone } from "@/lib/format";
 import { toFunctionSelector } from "viem";
 import { toast } from "sonner";
 
@@ -116,9 +116,14 @@ function Record({
           </Link>
         </Fact>
         <Fact label="Executor">
-          <AddressValue value={firewall.executor} copy />
+          <AddressValue value={firewall.executor} copy explorer />
         </Fact>
         <Fact label="Status">{status}</Fact>
+        {firewall.creationTxHash ? (
+          <Fact label="Created in">
+            <TxValue hash={firewall.creationTxHash} copy />
+          </Fact>
+        ) : null}
       </dl>
 
       <section className="mt-10">
@@ -143,7 +148,14 @@ function Record({
           <ul className="mt-3 divide-y divide-border border-y border-border">
             {targets.map((target) => (
               <li key={target.target} className="py-3 text-sm">
-                <Mono>{target.target}</Mono>
+                <span className="flex flex-wrap items-center gap-x-3">
+                  <Mono>{target.target}</Mono>
+                  {addressUrl(target.target) ? (
+                    <a href={addressUrl(target.target) ?? undefined} className="text-xs text-muted hover:text-fg" rel="noreferrer">
+                      Explorer
+                    </a>
+                  ) : null}
+                </span>
                 {target.name ? <span className="mt-1 block text-muted">{target.name}</span> : null}
               </li>
             ))}
