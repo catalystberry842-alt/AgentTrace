@@ -6,6 +6,7 @@ import { MONAD_TESTNET } from "@/lib/chain/network";
 import { apiError, apiJson } from "@/lib/developer/errors";
 import { publishDeveloperEvent } from "@/lib/developer/webhooks.server";
 import { configuredDemoProtocol } from "@/lib/chain/addresses.server";
+import { cachedOutcomeRequests, recordOutcomeRequest } from "@/lib/chain/chain-cache.server";
 
 const SIGNATURE = /^[A-Za-z_][A-Za-z0-9_]*\(([A-Za-z0-9]+)(,[A-Za-z0-9]+)*\)$/;
 const OPERATORS = new Set([">=", "<=", ">", "<", "==", "!="]);
@@ -168,7 +169,11 @@ export async function refuseOutcomeAnchor(executionId: string): Promise<Response
   );
 }
 
-export async function verifyOutcome(executionId: string, body: unknown): Promise<Response> {
+export async function verifyOutcome(
+  executionId: string,
+  body: unknown,
+  opts: { replay?: boolean } = {},
+): Promise<Response> {
   if (!/^0x[a-fA-F0-9]{64}$/.test(executionId)) {
     return apiError(400, "INVALID_REQUEST", "Execution id must be a 32-byte hex value.");
   }
@@ -211,7 +216,10 @@ export async function verifyOutcome(executionId: string, body: unknown): Promise
     on conflict (chain_id, outcome_id) do nothing
     returning outcome_id
   `;
-  if (inserted.length) {
+  if (!opts.replay) {
+    await recordOutcomeRequest({ executionId: id, expectation }).catch(() => undefined);
+  }
+  if (inserted.length && !opts.replay) {
     const event =
       result.status === "verified" ? "outcome.verified" : result.status === "failed" ? "outcome.failed" : "outcome.unverifiable";
     try {
@@ -488,4 +496,38 @@ export async function verifyDemoDepositOutcome(executionId: string): Promise<Res
       },
     },
   });
+}
+
+/**
+ * On a fresh serverless instance, re-run outcome checks that were requested elsewhere. Only the
+ * request (execution id and expectation) comes from the cache; the verdict is recomputed from
+ * Monad here, and no webhook is sent again.
+ */
+export async function replayOutcomeRequests(limit = 6): Promise<void> {
+  const slot = globalThis as typeof globalThis & { __agenttraceOutcomeReplay?: Set<string> };
+  const done = (slot.__agenttraceOutcomeReplay ??= new Set());
+  const requests = await cachedOutcomeRequests();
+  if (!requests.length) return;
+  const sql = await getSql();
+  let ran = 0;
+  for (const request of requests) {
+    if (ran >= limit) break;
+    const key = `${request.executionId}:${JSON.stringify(request.expectation)}`;
+    if (done.has(key)) continue;
+    const action = await sql<{ execution_id: string }>`
+      select execution_id from firewall_actions
+      where chain_id = ${MONAD_TESTNET.chainId} and execution_id = ${request.executionId}
+    `;
+    if (!action.length) continue; // not indexed here yet; try again on a later request
+    done.add(key);
+    const existing = await sql<{ outcome_id: string }>`
+      select outcome_id from execution_outcomes
+      where chain_id = ${MONAD_TESTNET.chainId} and execution_id = ${request.executionId}
+    `;
+    if (existing.length) continue;
+    ran += 1;
+    await verifyOutcome(request.executionId, { expectation: request.expectation }, { replay: true }).catch(
+      () => undefined,
+    );
+  }
 }

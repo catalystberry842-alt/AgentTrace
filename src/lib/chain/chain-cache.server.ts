@@ -25,7 +25,14 @@ type CachedLog = {
 };
 
 type ContractEntry = { scannedTo: number; logs: CachedLog[] };
-type CacheDoc = { version: 1; chainId: number; contracts: Record<string, ContractEntry> };
+/** An outcome check someone asked for. Only the request is kept; the verdict is recomputed. */
+export type OutcomeRequest = { executionId: string; expectation: unknown };
+type CacheDoc = {
+  version: 1;
+  chainId: number;
+  contracts: Record<string, ContractEntry>;
+  outcomeRequests?: OutcomeRequest[];
+};
 
 const PATHNAME = `agenttrace/chain-cache-${MONAD_TESTNET.chainId}.json`;
 const FLUSH_BLOCK_STEP = 20_000;
@@ -38,6 +45,7 @@ type State = {
   flushedTo: Record<string, number>;
   lastFlushAt: number;
   dirty: boolean;
+  requests: OutcomeRequest[];
 };
 const slot = globalThis as typeof globalThis & { __agenttraceChainCache?: State };
 function state(): State {
@@ -47,6 +55,7 @@ function state(): State {
     flushedTo: {},
     lastFlushAt: 0,
     dirty: false,
+    requests: [],
   };
   return slot.__agenttraceChainCache;
 }
@@ -85,6 +94,12 @@ function fromCached(log: CachedLog): Log {
     transactionIndex: null,
     removed: false,
   } as unknown as Log;
+}
+
+function mergeRequests(a: OutcomeRequest[] = [], b: OutcomeRequest[] = []): OutcomeRequest[] {
+  const seen = new Map<string, OutcomeRequest>();
+  for (const r of [...a, ...b]) seen.set(`${r.executionId}:${JSON.stringify(r.expectation)}`, r);
+  return [...seen.values()];
 }
 
 function sortLogs(logs: CachedLog[]): CachedLog[] {
@@ -187,7 +202,8 @@ async function flush(): Promise<void> {
     const contracts: Record<string, ContractEntry> = { ...(remote?.contracts ?? {}) };
     for (const [key, entry] of Object.entries(s.pending))
       contracts[key] = mergeEntry(contracts[key], entry);
-    const doc: CacheDoc = { version: 1, chainId: MONAD_TESTNET.chainId, contracts };
+    const outcomeRequests = mergeRequests(remote?.outcomeRequests, s.requests);
+    const doc: CacheDoc = { version: 1, chainId: MONAD_TESTNET.chainId, contracts, outcomeRequests };
     await put(PATHNAME, JSON.stringify(doc), {
       access: "private",
       addRandomSuffix: false,
@@ -199,9 +215,28 @@ async function flush(): Promise<void> {
       s.flushedTo[key] = entry.scannedTo;
       s.pending[key] = entry;
     }
+    s.requests = outcomeRequests;
     s.dirty = false;
     s.lastFlushAt = Date.now();
   } catch (err) {
     console.warn("[chain-cache] write failed:", err instanceof Error ? err.message : err);
   }
+}
+
+/** Remember that an outcome check was requested, so other instances can recompute it. */
+export async function recordOutcomeRequest(request: OutcomeRequest): Promise<void> {
+  if (!chainCacheEnabled()) return;
+  const s = state();
+  const before = s.requests.length;
+  s.requests = mergeRequests(s.requests, [request]);
+  if (s.requests.length > before) await flush();
+}
+
+/** Outcome checks requested on any instance, as of this process's first cache read. */
+export async function cachedOutcomeRequests(): Promise<OutcomeRequest[]> {
+  if (!chainCacheEnabled()) return [];
+  const s = state();
+  s.doc ??= readRemote();
+  const doc = await s.doc;
+  return mergeRequests(doc?.outcomeRequests, s.requests);
 }

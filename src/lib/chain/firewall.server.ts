@@ -564,6 +564,8 @@ export async function syncFirewallSafe(): Promise<IndexerStatus> {
     // few of them so verified status does not depend on which server instance answered.
     const { settlePendingProofs } = await import("@/lib/chain/proof.server");
     await settlePendingProofs(6).catch(() => undefined);
+    const { replayOutcomeRequests } = await import("@/lib/developer/outcome.server");
+    await replayOutcomeRequests().catch(() => undefined);
     return status;
   } catch (err) {
     const result: IndexerStatus = {
