@@ -10,11 +10,16 @@ An agent id is created in `AgentRegistry`. What that agent may call is stored in
 
 ## What a judge can check
 
-- Landing: the lifecycle, the problem, and why the contracts are on Monad testnet
-- `/demo`: the sequence above, or an explicit “not deployed” state with no fake success
-- Passport, firewall, proof, and outcome pages, which cite indexed chain data
+- Live app: https://agenttrace-plum.vercel.app
+- Demo video (82 s, real Monad testnet transactions): [docs/demo.mp4](demo.mp4)
+- A complete live example: agent [#006](https://agenttrace-plum.vercel.app/agents/6), firewall [#004](https://agenttrace-plum.vercel.app/firewalls/4), execution proof [0x3242aead…](https://agenttrace-plum.vercel.app/proofs/0x3242aeadc1ae0b511746852d623e71db91e3a49dbbe27662a886d65260c204df), and outcome [Deposited 100](https://agenttrace-plum.vercel.app/outcomes/0x3242aeadc1ae0b511746852d623e71db91e3a49dbbe27662a886d65260c204df); deposit transaction [0x6fbbd950…](https://testnet.monadvision.com/tx/0x6fbbd95042890cc346043ec2a79bb070929588580f49b197a4408cef47905c58)
+- `/demo`: identity → firewall → allowed deposit → proof → outcome → blocked withdraw. Running it needs a browser wallet on Monad testnet with a little testnet MON (under 0.1 MON for the five transactions); the withdraw is rejected by the firewall in simulation, so no transaction is sent for it
+- Passport, firewall, proof, and outcome pages, which cite indexed chain data and link to the Monad explorer
 - `docs/contracts.md` for the proof hash
-- `node scripts/test-firewall.mjs` and `node scripts/test-proof.mjs` for local EVM checks
+- `npm run test:contracts` for local EVM checks of the registry, firewall, proof, demo, developer API, and reputation logic
+- Screenshots: [docs/screenshots](screenshots)
+
+Earlier test runs registered agents #001–#005, #007, and #008 from the same wallet. Onchain history cannot be deleted, so they were deactivated with `AgentRegistry.deactivateAgent`; the agents list hides deactivated agents by default and shows them under All or Inactive.
 
 ## Deployment
 

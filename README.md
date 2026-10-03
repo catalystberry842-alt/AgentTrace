@@ -6,6 +6,8 @@ An onchain identity and provenance layer for AI agents on Monad.
 
 AI agents need more than wallets. They need identity, controlled permissions, execution provenance, and verifiable outcomes. AgentTrace provides those primitives on Monad testnet.
 
+**Live app:** https://agenttrace-plum.vercel.app · **Demo video:** [docs/demo.mp4](docs/demo.mp4) (82 s, real Monad testnet transactions) · **Submission notes:** [docs/submission.md](docs/submission.md)
+
 ## Overview
 
 An agent can call a contract. That does not, by itself, say which agent acted, which permissions were in force, whether the call really happened, or whether the intended result occurred.
@@ -175,7 +177,21 @@ Then register an agent, create a firewall, allow `DemoProtocol.deposit`, and cal
 
 `/demo` walks through identity, firewall, an allowed deposit, proof verification, outcome verification, and a blocked withdraw. It uses the configured Monad testnet contracts and the connected wallet. If those contracts are not deployed, the page says so and does not invent a result. If the RPC cannot be reached, it says the testnet connection is unavailable and offers retry.
 
-Script: [docs/demo-script.md](docs/demo-script.md).
+Script: [docs/demo-script.md](docs/demo-script.md). Recording: [docs/demo.mp4](docs/demo.mp4), made against the live app with real testnet transactions (agent #008, firewall #006, deposit [0x19b05db4…](https://testnet.monadvision.com/tx/0x19b05db42e4c2ea0885b0d3f8aa7fa4948a5507d9e3051feadf4067da4db78cd)).
+
+
+## Screenshots
+
+From the live deployment on Monad testnet. Agent #006 is a complete example: identity, firewall, allowed deposit, verified proof, and verified outcome.
+
+| | |
+| --- | --- |
+| ![Landing](docs/screenshots/01-landing.png) | ![Agent passport](docs/screenshots/02-agent-passport.png) |
+| Landing | Agent passport (#006) |
+| ![Demo run](docs/screenshots/03-demo-live-run.png) | ![Execution proof](docs/screenshots/04-execution-proof.png) |
+| `/demo` after a live run: deposit verified, withdraw blocked | Execution proof with every receipt check |
+| ![Firewall](docs/screenshots/05-firewall.png) | ![Agents](docs/screenshots/06-agents.png) |
+| Firewall #004 policy | Agents list (deactivated test agents hidden) |
 
 ## Security
 

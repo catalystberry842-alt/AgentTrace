@@ -3,6 +3,7 @@ node_modules
 dist
 .grok
 screenshots
+!docs/screenshots/
 artifacts
 .env
 .env.*
