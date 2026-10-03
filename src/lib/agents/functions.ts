@@ -5,6 +5,7 @@ import {
   confirmRegistrationReceipt,
   configuredRegistry,
   decodeRegisterCall,
+  findTransaction,
   getIndexedAgent,
   getPublicClient,
   listAgentEvents,
@@ -117,8 +118,7 @@ async function readRegistrationTx(
 ) {
   const registry = configuredRegistry();
   if (!registry) throw new Error("Agent Registry is not deployed. No transaction was sent.");
-  const client = getPublicClient();
-  const tx = await client.getTransaction({ hash: txHash }).catch(() => null);
+  const tx = await findTransaction(txHash);
   if (!tx) throw new Error("Transaction was not found on Monad testnet.");
   if (!tx.to || tx.to.toLowerCase() !== registry) {
     throw new Error("Transaction does not call the Agent Registry.");
@@ -693,7 +693,7 @@ export const submitFirewall = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const firewall = configuredFirewall();
     if (!firewall) throw new Error("Agent Firewall is not deployed. No transaction was sent.");
-    const tx = await getPublicClient().getTransaction({ hash: data.txHash }).catch(() => null);
+    const tx = await findTransaction(data.txHash);
     if (!tx) throw new Error("Transaction was not found on Monad testnet.");
     if (!tx.to || tx.to.toLowerCase() !== firewall) throw new Error("Transaction does not call the Agent Firewall.");
     const call = decodeCreateFirewallCall(tx.input);

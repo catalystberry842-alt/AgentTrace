@@ -73,6 +73,25 @@ async function ensureMonad(eth: EthereumProvider): Promise<void> {
   }
 }
 
+/**
+ * Wallets return the hash as soon as the transaction is broadcast. AgentTrace's server reads
+ * the transaction from a public RPC node, which may not have it yet, so wait (through the
+ * wallet's own provider) until a receipt exists. After the timeout the hash is returned anyway
+ * and the server reports the record as pending.
+ */
+async function waitForInclusion(eth: EthereumProvider, hash: `0x${string}`, timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const receipt = await eth.request({ method: "eth_getTransactionReceipt", params: [hash] });
+      if (receipt && typeof receipt === "object") return;
+    } catch {
+      // Some wallets reject read calls briefly after a send; keep polling until the deadline.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }
+}
+
 export async function getSigner(): Promise<ChainSigner> {
   const eth = provider();
   let accounts: unknown;
@@ -108,6 +127,7 @@ export async function getSigner(): Promise<ChainSigner> {
       if (typeof hash !== "string" || !/^0x[a-fA-F0-9]{64}$/.test(hash)) {
         throw new Error("Wallet did not return a transaction hash.");
       }
+      await waitForInclusion(eth, hash as `0x${string}`);
       return hash as `0x${string}`;
     },
   };

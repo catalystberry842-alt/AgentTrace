@@ -33,6 +33,21 @@ export function getPublicClient() {
     transport: monadTransport(),
   });
 }
+
+/**
+ * Read a transaction the browser just submitted. The wallet usually waits for inclusion first,
+ * but the public RPC node answering here can lag behind the wallet's node, so retry briefly
+ * before reporting it as missing.
+ */
+export async function findTransaction(hash: `0x${string}`, timeoutMs = 10_000) {
+  const client = getPublicClient();
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const tx = await client.getTransaction({ hash }).catch(() => null);
+    if (tx || Date.now() >= deadline) return tx;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+}
 const SYNC_INTERVAL_MS = 15_000;
 
 type SyncSlot = {
