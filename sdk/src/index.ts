@@ -7,6 +7,8 @@ import { Outcomes } from "./outcomes/outcomes.ts";
 import { Proofs } from "./proofs/proofs.ts";
 import type { AgentTraceOptions } from "./types/index.ts";
 import { verifySignature } from "./webhooks/verify.ts";
+import { traceCall, TRACE_NETWORKS } from "./trace/trace.ts";
+export type { TraceCallInput, TraceCallResult, TraceNetwork } from "./trace/trace.ts";
 
 export class AgentTrace {
   readonly agents: Agents;
@@ -33,7 +35,7 @@ export class AgentTrace {
   }
 }
 
-export { AgentTraceError, verifySignature };
+export { AgentTraceError, verifySignature, traceCall, TRACE_NETWORKS };
 export type {
   Agent,
   AgentTraceOptions,

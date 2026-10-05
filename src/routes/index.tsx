@@ -7,6 +7,7 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Shell } from "@/components/shell";
 import { buttonClass, EmptyState, ErrorNote, Mono, SkeletonLines, StatusText } from "@/components/ui";
 import { formatAgentId, statusLabel, statusTone } from "@/lib/format";
+import { MONAD_TESTNET } from "@/lib/chain/network";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -147,7 +148,7 @@ function Landing({ pending }: { pending: boolean }) {
       <section>
         <h1 className="type-display text-balance">AgentTrace</h1>
         <p className="mt-4 text-lg text-fg">Every agent leaves a trace.</p>
-        <p className="mt-3 max-w-md text-sm text-pretty text-muted">An onchain identity and provenance layer for AI agents on Monad.</p>
+        <p className="mt-3 max-w-md text-sm text-pretty text-muted">An independent validator and audit trail for onchain agents on Monad.</p>
         <p className="mt-3 max-w-sm text-sm text-pretty text-muted">
           Control what your agents can do.
           <br />
@@ -209,12 +210,15 @@ function Landing({ pending }: { pending: boolean }) {
         <p className="mt-3 text-sm text-pretty text-muted">
           AgentTrace keeps those answers separate: an onchain identity, a firewall of allowed calls, the execution itself, an independent proof that the execution happened, and a separate check of the outcome.
         </p>
+        <p className="mt-3 text-sm text-pretty text-muted">
+          Verdicts are posted to the ERC-8004 Validation and Reputation registries, so any wallet, marketplace, or agent can read an agent's verified record without trusting AgentTrace's interface.
+        </p>
       </section>
 
       <section className="mt-10 max-w-xl">
         <h2 className="text-sm font-medium">Why Monad</h2>
         <p className="mt-3 text-sm text-pretty text-muted">
-          Permissions are enforced by a Solidity contract, not by the browser. Monad testnet is EVM-compatible, so AgentRegistry, AgentFirewall, AgentProof, and DemoProtocol are ordinary contracts on chain 10143. AgentTrace reads their events from the public testnet RPC. A claim in the interface is not treated as proof.
+          Every check is an onchain transaction. On {MONAD_TESTNET.label} a proof anchor uses 179,045 gas, about 0.018 MON at the 102 gwei price we measured, so anchoring every verified execution is affordable. Blocks finalize after two blocks (about 600 ms, per the Monad docs), so a proof can be written and read back in seconds. The four contracts are ordinary Solidity on chain {MONAD_TESTNET.chainId}; the firewall enforces permissions, not the browser.
         </p>
       </section>
     </Shell>

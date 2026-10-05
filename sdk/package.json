@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "TypeScript client for AgentTrace on Monad testnet.",
+  "description": "TypeScript client for AgentTrace on Monad. traceCall routes an agent call through AgentFirewall on testnet or mainnet.",
   "exports": {
     ".": "./src/index.ts"
   },
-  "types": "./src/index.ts"
+  "types": "./src/index.ts",
+  "peerDependencies": {
+    "viem": "^2.40.0"
+  }
 }

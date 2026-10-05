@@ -11,9 +11,20 @@ Solidity 0.8.31. No proxy, no `delegatecall`, no `tx.origin`. Custom errors. Che
 | AgentProof | Immutable proof-hash anchors | [`0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e`](https://testnet.monadvision.com/address/0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e) | 67788400 | [`0x4e017247…`](https://testnet.monadvision.com/tx/0x4e0172478ce7dde026c13d6c020cd5788e4ba64a9cf42d38554c02643b2d95b4) |
 | DemoProtocol | Deposit, swap, and withdraw demo target | [`0x1664be58ee54af91c756428f466bad6e4f9911c3`](https://testnet.monadvision.com/address/0x1664be58ee54af91c756428f466bad6e4f9911c3) | 67788404 | [`0xd9f5fad6…`](https://testnet.monadvision.com/tx/0xd9f5fad6e0043f9980e084643ea60dc47c6572139072de9f6ded64c20f38bdae) |
 
+`src/lib/chain/deployment-mainnet.ts` records the Monad mainnet deployment of 5 October 2026. The addresses are the same as testnet (same deployer, same nonces):
+
+| Contract | Address (Monad mainnet, 143) | Deploy block | Deploy tx |
+| --- | --- | --- | --- |
+| AgentRegistry | [`0xfa66d202dae4b7fb9aa5c6ee80390ca8bb48739e`](https://monadvision.com/address/0xfa66d202dae4b7fb9aa5c6ee80390ca8bb48739e) | 110869327 | [`0x65bf8edd…`](https://monadvision.com/tx/0x65bf8edd7aefa5805afae5984e94f6f0e65315a9fc9f152b3e25900d4a395255) |
+| AgentFirewall | [`0x694178a2396b54bff6a25caa0aa9cca6eb079441`](https://monadvision.com/address/0x694178a2396b54bff6a25caa0aa9cca6eb079441) | 110869330 | [`0xd1c07b28…`](https://monadvision.com/tx/0xd1c07b28ad4c7e937bc2d5f78124cb14cefe4ac3c0f22ffea3f131c9663e308f) |
+| AgentProof | [`0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e`](https://monadvision.com/address/0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e) | 110869333 | [`0xa347bfa7…`](https://monadvision.com/tx/0xa347bfa7657e54d7457c52b0503eed3209df39e10def8fe3798646bd89a47619) |
+| DemoProtocol | [`0x1664be58ee54af91c756428f466bad6e4f9911c3`](https://monadvision.com/address/0x1664be58ee54af91c756428f466bad6e4f9911c3) | 110869336 | [`0x3e13bee3…`](https://monadvision.com/tx/0x3e13bee34bd16a9701c6372d6338245f593b411f52e9e0fd2b63a2e25ce38b37) |
+
+On mainnet the AgentProof verifier `0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85` was passed to the constructor, so no `setVerifier` transaction was needed.
+
 A deployment is real only after a confirmed transaction, or after the matching environment variable is set to a `0x` address.
 
-`npm run deploy:testnet` (`scripts/deploy-contracts.mjs`) deploys all four contracts to Monad testnet and writes each address only after its receipt succeeds and bytecode is present. See the README section "Deploying the contracts to Monad testnet".
+`npm run deploy:testnet` (`scripts/deploy-contracts.mjs`) deploys all four contracts to Monad testnet and writes each address only after its receipt succeeds and bytecode is present. `npm run deploy:mainnet -- --confirm-mainnet` does the same on mainnet. See the README section "Deploying the contracts".
 
 ## AgentRegistry
 
@@ -108,3 +119,14 @@ Events: `Deposited`, `Swapped`, `Withdrawn`.
 The agent id is an argument because the firewall call has to say which agent the accounting belongs to. These are not zero-argument functions.
 
 It does not hold MON and has no administrator. Balances are accounting numbers, not custody. `swap` moves recorded deposit units into `swapped`. `withdraw` reverts when the recorded deposit is too small. This is not a production financial protocol.
+
+## ERC-8004 registries (external)
+
+AgentTrace does not deploy these; it uses the canonical ERC-8004 deployments and writes to them as an independent validator. Addresses, the link rule, and live transactions are in the README section "ERC-8004". ABIs used: `src/lib/chain/erc8004.ts`.
+
+| Call | Sender | Values |
+| --- | --- | --- |
+| `IdentityRegistry.register(agentURI, [("agenttrace", abi.encode(chainId, AgentRegistry, agentId))])` | agent owner | registration file at `/api/erc8004/agents/<agentId>` |
+| `ValidationRegistry.validationRequest(verifier, agentId, proofURL, proofHash)` | agent owner | only offered for an anchored proof |
+| `ValidationRegistry.validationResponse(proofHash, 100, proofURL, proofHash, "agenttrace-execution")` | AgentTrace verifier | only after the proof is receipt-verified and anchored in `AgentProof` |
+| `ReputationRegistry.giveFeedback(agentId, 100 or 0, 0, "agenttrace-outcome", executionId, …)` | AgentTrace verifier | 100 when the outcome verified, 0 when it failed |

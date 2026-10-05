@@ -1,6 +1,37 @@
 # SDK
 
-Package: `@agenttrace/sdk` in `sdk/`. It is not published to npm. Network values other than `monad-testnet` throw `MAINNET_UNAVAILABLE` before any request.
+Package: `@agenttrace/sdk` in `sdk/`. It is not published to npm. `viem` (2.40 or newer) is a peer dependency.
+
+## `traceCall`: one line for an existing agent
+
+```ts
+import { traceCall } from "@agenttrace/sdk";
+
+const result = await traceCall({
+  network: "monad-testnet",          // or "monad-mainnet" (real MON)
+  signer: process.env.AGENT_KEY,     // the firewall's executor: hex key or viem Account
+  firewallId: 4,
+  target: "0x1664be58ee54af91c756428f466bad6e4f9911c3",
+  data,                              // calldata the agent was going to send
+});
+```
+
+1. Simulates `AgentFirewall.execute(firewallId, target, value, data)`. If the firewall would revert, it throws `FIREWALL_REJECTED` and sends nothing. An RPC failure throws `RPC_UNAVAILABLE`, also without sending.
+2. Sends the transaction and waits for the receipt. A reverted receipt throws `EXECUTION_REVERTED`.
+3. Reads `AgentAction` from the receipt for the execution id.
+4. Calls `POST /api/proofs/<executionId>/verify` on the AgentTrace app with the transaction hash as a hint, so the server reads that receipt itself even if its indexer is behind. It repeats until a verdict or the timeout (60 s by default).
+
+Returns `{ txHash, executionId, agentId, proofStatus, proofHash, proofUrl, explorerUrl }`. `proofStatus` is the server's verdict (`receipt_verified` or `unverifiable`), or null if no verdict arrived in time. The SDK never marks a proof verified itself.
+
+Example: [`sdk/examples/trace-call.ts`](../sdk/examples/trace-call.ts).
+
+```bash
+AGENT_KEY=0x... FIREWALL_ID=4 AGENT_ID=6 npx tsx sdk/examples/trace-call.ts
+```
+
+## API client
+
+The `AgentTrace` class wraps the developer API. It accepts only `network: "monad-testnet"`; other values throw `MAINNET_UNAVAILABLE` before any request, because the developer API (API keys, webhooks) needs the account database, which the hosted mainnet app does not run.
 
 ```ts
 import { AgentTrace } from "@agenttrace/sdk";

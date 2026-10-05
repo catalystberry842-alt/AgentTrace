@@ -2,7 +2,7 @@
 
 ## Short description
 
-AgentTrace is an onchain identity and provenance layer for AI agents on Monad. It gives agents persistent identities, controlled execution permissions, independently verifiable execution proofs, and protocol-specific outcome verification.
+AgentTrace is an independent validator and audit trail for onchain agents on Monad. Every agent call gets an onchain identity, an onchain permission check, a receipt-verified proof anchored onchain, and a separate outcome verdict, and those verdicts are published to the ERC-8004 Validation and Reputation registries. Live on Monad mainnet and testnet.
 
 ## Longer description
 
@@ -10,7 +10,9 @@ An agent id is created in `AgentRegistry`. What that agent may call is stored in
 
 ## What a judge can check
 
-- Live app: https://agenttrace-plum.vercel.app
+- Live app on Monad mainnet (chain 143): https://agenttrace-mainnet.vercel.app
+- Live app on Monad testnet (chain 10143): https://agenttrace-plum.vercel.app
+- Mainnet example: agent [#001](https://agenttrace-mainnet.vercel.app/agents/1) (ERC-8004 #10280), firewall [#001](https://agenttrace-mainnet.vercel.app/firewalls/1), execution proof [0x52c98d50…](https://agenttrace-mainnet.vercel.app/proofs/0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e) anchored in [`0x2151d023…`](https://monadvision.com/tx/0x2151d023a27cc9f1f1aecda0b8dc74ed44e7e9b5936a7b18c5ca2b1127feff08), ERC-8004 `validationResponse` [`0xd727a688…`](https://monadvision.com/tx/0xd727a688ae93a2078ee9a0e9e39d31bb2c35ed4de8364640a731abd9524d4231) and `giveFeedback` [`0x3c05024a…`](https://monadvision.com/tx/0x3c05024ac5e0f78972734ee68cce1a4bb7126b375d3500a4e6be405f4a81aef6)
 - Demo video (82 s, real Monad testnet transactions): [docs/demo.mp4](demo.mp4)
 - A complete live example: agent [#006](https://agenttrace-plum.vercel.app/agents/6), firewall [#004](https://agenttrace-plum.vercel.app/firewalls/4), execution proof [0x3242aead…](https://agenttrace-plum.vercel.app/proofs/0x3242aeadc1ae0b511746852d623e71db91e3a49dbbe27662a886d65260c204df) (anchored onchain in [`0x577824ab…`](https://testnet.monadvision.com/tx/0x577824ab9bef8a84f9b2b0063d8bd580986e456d10a7837861483f9bc26737c4)), and outcome [Deposited 100](https://agenttrace-plum.vercel.app/outcomes/0x3242aeadc1ae0b511746852d623e71db91e3a49dbbe27662a886d65260c204df); deposit transaction [0x6fbbd950…](https://testnet.monadvision.com/tx/0x6fbbd95042890cc346043ec2a79bb070929588580f49b197a4408cef47905c58)
 - `/demo`: identity → firewall → allowed deposit → proof → outcome → onchain anchor → blocked withdraw. Running it needs a browser wallet on Monad testnet with a little testnet MON (under 0.1 MON for the five transactions); the withdraw is rejected by the firewall in simulation, so no transaction is sent for it
@@ -23,9 +25,24 @@ Earlier test runs registered agents #001–#005 and #007–#011 from the same wa
 
 ## Deployment
 
+### Monad mainnet (chain 143), deployed 5 October 2026
+
+Live app: https://agenttrace-mainnet.vercel.app (same codebase, built with `VITE_MONAD_NETWORK=mainnet`).
+
+| Contract | Address | Deploy block | Deploy tx |
+| --- | --- | --- | --- |
+| AgentRegistry | [`0xfa66d202dae4b7fb9aa5c6ee80390ca8bb48739e`](https://monadvision.com/address/0xfa66d202dae4b7fb9aa5c6ee80390ca8bb48739e) | 110869327 | [`0x65bf8edd…`](https://monadvision.com/tx/0x65bf8edd7aefa5805afae5984e94f6f0e65315a9fc9f152b3e25900d4a395255) |
+| AgentFirewall | [`0x694178a2396b54bff6a25caa0aa9cca6eb079441`](https://monadvision.com/address/0x694178a2396b54bff6a25caa0aa9cca6eb079441) | 110869330 | [`0xd1c07b28…`](https://monadvision.com/tx/0xd1c07b28ad4c7e937bc2d5f78124cb14cefe4ac3c0f22ffea3f131c9663e308f) |
+| AgentProof | [`0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e`](https://monadvision.com/address/0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e) | 110869333 | [`0xa347bfa7…`](https://monadvision.com/tx/0xa347bfa7657e54d7457c52b0503eed3209df39e10def8fe3798646bd89a47619) |
+| DemoProtocol | [`0x1664be58ee54af91c756428f466bad6e4f9911c3`](https://monadvision.com/address/0x1664be58ee54af91c756428f466bad6e4f9911c3) | 110869336 | [`0x3e13bee3…`](https://monadvision.com/tx/0x3e13bee34bd16a9701c6372d6338245f593b411f52e9e0fd2b63a2e25ce38b37) |
+
+The verifier `0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85` was set in the AgentProof constructor. Total deploy cost: 0.352 MON. See the README "ERC-8004" section for the mainnet and testnet ERC-8004 transactions.
+
+### Monad testnet (chain 10143)
+
 Live app: https://agenttrace-plum.vercel.app (Vercel, wallet-only mode: no application accounts; the connected wallet is the identity and signs every chain action).
 
-Contracts on Monad testnet (chain id 10143), deployed 3 October 2026:
+Deployed 3 October 2026:
 
 | Contract | Purpose | Address (Monad testnet, 10143) | Deploy block | Deploy tx |
 | --- | --- | --- | --- | --- |
@@ -55,4 +72,6 @@ Proof anchoring is on. The AgentProof verifier is a dedicated server wallet, [`0
 
 **Why onchain?** The permission check and the event are outside the agent process.
 
-**Why Monad?** The contracts are EVM Solidity, and the testnet is where those transactions and logs are read. No performance number is claimed.
+**Why ERC-8004?** So the verdict is not locked inside AgentTrace. Any marketplace or agent can call `getValidationStatus(proofHash)` or `getSummary(agentId, …)` on the shared registries.
+
+**Why Monad?** AgentTrace writes onchain at every step, so cost and finality matter. Measured on Monad: an `anchorProof` uses 179,045 gas (about 0.018 MON at the 102 gwei seen on 5 October 2026), an `execute` 154,784 gas, and deploying all four contracts on mainnet cost 0.352 MON. Per the Monad docs, blocks come every 300 ms and are final after two blocks (about 600 ms), so a proof is anchored and readable within seconds with no reorg handling. The contracts are ordinary EVM Solidity.

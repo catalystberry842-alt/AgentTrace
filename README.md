@@ -2,11 +2,11 @@
 
 Every agent leaves a trace.
 
-An onchain identity and provenance layer for AI agents on Monad.
+An independent validator and audit trail for onchain agents on Monad.
 
-AI agents need more than wallets. They need identity, controlled permissions, execution provenance, and verifiable outcomes. AgentTrace provides those primitives on Monad testnet.
+An agent that holds a wallet can call anything. AgentTrace gives every agent call four separate, checkable facts: which agent acted (identity), what it was allowed to do (an onchain firewall), what actually executed (a receipt-verified proof anchored onchain), and whether the intended result happened (outcome verification). Verdicts are published to the ERC-8004 Validation and Reputation registries, so any wallet, marketplace, or other agent can read them without trusting this app. Live on Monad mainnet and testnet.
 
-**Live app:** https://agenttrace-plum.vercel.app · **Demo video:** [docs/demo.mp4](docs/demo.mp4) (82 s, real Monad testnet transactions) · **Submission notes:** [docs/submission.md](docs/submission.md)
+**Live app (mainnet, chain 143):** https://agenttrace-mainnet.vercel.app · **Live app (testnet, chain 10143):** https://agenttrace-plum.vercel.app · **Demo video:** [docs/demo.mp4](docs/demo.mp4) (82 s, real Monad testnet transactions) · **Submission notes:** [docs/submission.md](docs/submission.md)
 
 ## Overview
 
@@ -18,6 +18,7 @@ An agent can call a contract. That does not, by itself, say which agent acted, w
 - **Firewall.** `AgentFirewall` is the only path for an approved call. The owner sets the executor, targets, function selectors, and value limits.
 - **Execution.** The executor calls `execute`. If the target reverts, the whole transaction reverts. A successful `AgentAction` is emitted only after the target call succeeds.
 - **Proof.** An off-chain verifier reads the Monad transaction and receipt. It marks an execution verified only when every critical check matches. It does not trust the browser.
+- **ERC-8004.** An AgentTrace agent can be linked to an ERC-8004 identity owned by the same wallet. Each anchored proof becomes a `validationResponse` in the ERC-8004 Validation Registry, and each outcome verdict becomes `giveFeedback` in the Reputation Registry, both posted by the AgentTrace verifier wallet.
 - **Outcome.** A separate check looks for the expected protocol event, or a Demo Protocol balance that this transaction actually changed. A verified execution is not a verified outcome. An unsupported protocol is `unverifiable`, not verified.
 
 ## Architecture
@@ -35,13 +36,33 @@ Agent
 
 See [docs/architecture.md](docs/architecture.md) and [docs/security.md](docs/security.md).
 
-## Monad
+## Why Monad
 
-Monad testnet (chain id 10143) is EVM-compatible. AgentTrace contracts are ordinary Solidity 0.8.31 contracts. The indexer and proof verifier read logs and receipts from the public testnet RPC (`https://testnet-rpc.monad.xyz`). If that endpoint fails or rate-limits, the server falls back to the other public testnet endpoints listed in the Monad docs (`https://rpc-testnet.monadinfra.com`, then `https://rpc.ankr.com/monad_testnet`). Setting `MONAD_TESTNET_RPC_URL` replaces the list with that one endpoint. Permissions are enforced in `AgentFirewall`, not in the client.
+AgentTrace writes to the chain on every step: register, firewall policy, execute, anchor, and the ERC-8004 posts. That only works if those writes are cheap and final quickly. Measured on Monad (gas from real receipts; Monad charges the gas limit, and the price seen on 5 October 2026 was 102 gwei: 100 base fee plus 2 priority):
+
+| Step | Gas | MON at 102 gwei |
+| --- | --- | --- |
+| `AgentRegistry.registerAgent` | 242,728 | ≈0.025 |
+| `AgentFirewall.createFirewall` | 245,633 | ≈0.025 |
+| Allow target / allow function | 121,600 / 111,686 | ≈0.012 / 0.011 |
+| `AgentFirewall.execute` (Demo deposit) | 154,784 | ≈0.016 |
+| `AgentProof.anchorProof` | 179,045 | ≈0.018 |
+| ERC-8004 `register` + metadata | 291,834 (estimate) | ≈0.030 |
+| ERC-8004 `validationRequest` | 276,048 | ≈0.028 |
+
+Deploying all four contracts on mainnet cost 0.352 MON in total. Anchoring every verified execution costs about 0.018 MON each.
+
+Per the [Monad docs](https://docs.monad.xyz/developer-essentials/summary), blocks are produced every 300 ms and are final after two blocks (about 600 ms), and the per-transaction gas limit is 30M. So a proof can be anchored and read back within seconds, and the verifier does not have to wait out reorgs. Monad is EVM-compatible, so the contracts are ordinary Solidity 0.8.31 and the app uses viem.
+
+### RPC and indexing
+
+The indexer and proof verifier read logs and receipts from public Monad RPCs: on testnet `https://testnet-rpc.monad.xyz`, falling back to `https://rpc-testnet.monadinfra.com` and `https://rpc.ankr.com/monad_testnet`; on mainnet `https://rpc.monad.xyz`, falling back to `https://rpc-mainnet.monadinfra.com`. Setting `MONAD_TESTNET_RPC_URL` replaces the list with that one endpoint. Permissions are enforced in `AgentFirewall`, not in the client.
 
 Public Monad RPCs limit `eth_getLogs` to 100 blocks per call (see [RPC limits](https://docs.monad.xyz/reference/rpc-limits)). The indexer scans in 100-block windows, a few windows at a time, and saves its cursor after each window. One sync call stops after a short time budget (4 s by default, `MONAD_INDEXER_BUDGET_MS`) and the next request continues from the saved block, so a page never waits on a long catch-up. Registrations, firewall changes, and executions submitted through the app are also confirmed directly from their transaction receipts, so they appear right away even while the history scan is behind.
 
-No throughput or gas figure is claimed here. The deployment record in this repository contains only addresses from confirmed Monad testnet transactions (see Smart contracts below). Environment variables may override it.
+### Network selection
+
+One codebase serves both networks. `VITE_MONAD_NETWORK=mainnet` selects Monad mainnet (chain 143, `src/lib/chain/deployment-mainnet.ts`); anything else selects testnet (chain 10143, `src/lib/chain/deployment.ts`). The two hosted apps are two Vercel projects built from the same `main` branch.
 
 ## Features
 
@@ -51,6 +72,10 @@ Implemented in this repository:
 - Firewall creation, executor, targets, functions, value policy, pause, unpause, and deactivation
 - Execution through `AgentFirewall.execute`, with revert of the whole transaction if the target reverts
 - Receipt-based proof verification and deterministic proof hashing
+- Monad mainnet and testnet from one codebase (`VITE_MONAD_NETWORK`)
+- ERC-8004 integration: link an agent to an ERC-8004 identity, publish proof verdicts to the Validation Registry and outcome verdicts to the Reputation Registry, and serve an ERC-8004 registration file at `/api/erc8004/agents/<agentId>`
+- Owner-only firewall controls: management forms appear only for the connected owner or executor wallet
+- `traceCall` in the SDK: one function that routes an agent's call through the firewall and returns its AgentTrace proof
 - Onchain proof anchoring in `AgentProof`: after a proof is receipt-verified, the server verifier commits its proof hash onchain (live on the hosted app)
 - Outcome verification for an expected event, and for Demo Protocol `deposits` or `swapped` when the onchain value matches
 - Indexed agent directory, passport, activity, proofs, and outcomes
@@ -61,7 +86,6 @@ Implemented in this repository:
 
 Not implemented:
 
-- Monad mainnet
 - A server-side executor that submits firewall transactions for the API
 - Upgradeable contracts
 - A claim that agents are safe or trustless
@@ -83,9 +107,22 @@ Not implemented:
 | AgentProof | Immutable proof-hash anchors | [`0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e`](https://testnet.monadvision.com/address/0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e) | 67788400 | [`0x4e017247…`](https://testnet.monadvision.com/tx/0x4e0172478ce7dde026c13d6c020cd5788e4ba64a9cf42d38554c02643b2d95b4) |
 | DemoProtocol | Deposit, swap, and withdraw demo target | [`0x1664be58ee54af91c756428f466bad6e4f9911c3`](https://testnet.monadvision.com/address/0x1664be58ee54af91c756428f466bad6e4f9911c3) | 67788404 | [`0xd9f5fad6…`](https://testnet.monadvision.com/tx/0xd9f5fad6e0043f9980e084643ea60dc47c6572139072de9f6ded64c20f38bdae) |
 
+### Monad mainnet (chain 143)
+
+| Contract | Address (Monad mainnet, 143) | Deploy block | Deploy tx |
+| --- | --- | --- | --- |
+| AgentRegistry | [`0xfa66d202dae4b7fb9aa5c6ee80390ca8bb48739e`](https://monadvision.com/address/0xfa66d202dae4b7fb9aa5c6ee80390ca8bb48739e) | 110869327 | [`0x65bf8edd…`](https://monadvision.com/tx/0x65bf8edd7aefa5805afae5984e94f6f0e65315a9fc9f152b3e25900d4a395255) |
+| AgentFirewall | [`0x694178a2396b54bff6a25caa0aa9cca6eb079441`](https://monadvision.com/address/0x694178a2396b54bff6a25caa0aa9cca6eb079441) | 110869330 | [`0xd1c07b28…`](https://monadvision.com/tx/0xd1c07b28ad4c7e937bc2d5f78124cb14cefe4ac3c0f22ffea3f131c9663e308f) |
+| AgentProof | [`0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e`](https://monadvision.com/address/0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e) | 110869333 | [`0xa347bfa7…`](https://monadvision.com/tx/0xa347bfa7657e54d7457c52b0503eed3209df39e10def8fe3798646bd89a47619) |
+| DemoProtocol | [`0x1664be58ee54af91c756428f466bad6e4f9911c3`](https://monadvision.com/address/0x1664be58ee54af91c756428f466bad6e4f9911c3) | 110869336 | [`0x3e13bee3…`](https://monadvision.com/tx/0x3e13bee34bd16a9701c6372d6338245f593b411f52e9e0fd2b63a2e25ce38b37) |
+
+Deployed on 5 October 2026 by the same deployer with `npm run deploy:mainnet -- --confirm-mainnet`. The addresses match testnet because the deployer's nonces 0–3 were the same on both chains. The AgentProof verifier (`0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85`) was set in the constructor; `AgentProof.verifier()` returns it.
+
+### Testnet (chain 10143)
+
 Deployed on 3 October 2026 by `0x4f3f999B60750cEf97D7D56c75f30F050A583D53` with `npm run deploy:testnet`. `AgentFirewall.agentRegistry()` returns the registry above. The AgentProof verifier is a dedicated server wallet, [`0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85`](https://testnet.monadvision.com/address/0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85), set by the owner with `setVerifier` ([`0x9f239ab5…`](https://testnet.monadvision.com/tx/0x9f239ab50f69b909d7ff07d3ba4cedb6e92a81cf092f439acda90b03dd573208)). The hosted app holds its key as a sensitive server environment variable and anchors each verified proof hash, for example agent #006 ([`0x577824ab…`](https://testnet.monadvision.com/tx/0x577824ab9bef8a84f9b2b0063d8bd580986e456d10a7837861483f9bc26737c4)). Addresses stay null until a confirmed transaction exists. Environment variables may override the record. See [docs/contracts.md](docs/contracts.md).
 
-## Deploying the contracts to Monad testnet
+## Deploying the contracts
 
 One command deploys all four contracts in order (registry, firewall with the registry address, proof anchor, demo protocol) and writes every confirmed address, block, and transaction hash to `src/lib/chain/deployment.ts`:
 
@@ -100,7 +137,61 @@ git add src/lib/chain/deployment.ts && git commit -m "Record Monad testnet deplo
 - The AgentProof verifier is the address of `AGENT_PROOF_VERIFIER_PRIVATE_KEY` when set, else `AGENT_PROOF_VERIFIER_ADDRESS`, else the deployer. The owner can change it later with `setVerifier`.
 - The private key is read from the environment only. Do not commit it or put it in a hosted app's environment.
 
+Mainnet uses the same script and writes `src/lib/chain/deployment-mainnet.ts`. It refuses to run without the explicit flag:
+
+```bash
+MONAD_DEPLOYER_PRIVATE_KEY=0x... npm run deploy:mainnet -- --confirm-mainnet
+```
+
 Committing the record means every build uses the addresses without extra environment variables.
+
+## ERC-8004
+
+[ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) defines three registries for trustless agents: Identity, Reputation, and Validation. AgentTrace acts as an independent validator. The registries used are the canonical deployments (all have code on both chains):
+
+| Registry | Monad mainnet (143) | Monad testnet (10143) |
+| --- | --- | --- |
+| Identity | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
+| Reputation | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
+| Validation | `0x8004Cc8439f36fd5F9F049D9fF86523Df6dAAB58` | `0x8004Cb1BF31DAf7788923b405b754f57acEB4272` |
+
+How it works:
+
+1. **Link.** On the agent passport, the owner registers an ERC-8004 identity with the agent's registration file (`/api/erc8004/agents/<agentId>`) and the metadata key `agenttrace` = `abi.encode(chainId, AgentRegistry, agentId)`. AgentTrace accepts the link only if the ERC-8004 identity has the same owner as the AgentTrace agent and that metadata matches.
+2. **Request.** On an anchored proof, the agent owner sends `validationRequest(validator = AgentTrace verifier, agentId, requestURI = proof page, requestHash = proof hash)`.
+3. **Respond.** The verifier wallet answers with `validationResponse(requestHash, 100, …, responseHash = proof hash, tag = "agenttrace-execution")`. It only answers for a proof it has receipt-verified and anchored in `AgentProof`.
+4. **Reputation.** The verifier posts `giveFeedback(agentId, 100 if the outcome verified else 0, tag1 = "agenttrace-outcome", tag2 = executionId)`. The execution id in `tag2` keeps one feedback per execution.
+
+Live examples:
+
+| | Mainnet | Testnet |
+| --- | --- | --- |
+| AgentTrace agent → ERC-8004 id | #001 → [#10280](https://agenttrace-mainnet.vercel.app/agents/1) | #006 → [#2014](https://agenttrace-plum.vercel.app/agents/6) |
+| Identity register tx | [`0x799ae99e…`](https://monadvision.com/tx/0x799ae99ee300791602c895e9655af0b74cb76a49d8ce49cae5c0d4caa1ce8bb5) | [`0x8b0326ac…`](https://testnet.monadvision.com/tx/0x8b0326ac059ad00b1ebbd57ad761cea3e5c99ec1f84d5653a7b754101bcd0ee2) |
+| `validationRequest` (owner) | [`0xa0003774…`](https://monadvision.com/tx/0xa000377418f2a13d3e1f87a06c11dcd1a8f666987e713e01f62338fa9000abb3) | [`0x0b8de463…`](https://testnet.monadvision.com/tx/0x0b8de46375aa61be9a710bc7efca4966c33528d6a828d7cdd8c00101314619fa) |
+| `validationResponse` 100 (verifier) | [`0xd727a688…`](https://monadvision.com/tx/0xd727a688ae93a2078ee9a0e9e39d31bb2c35ed4de8364640a731abd9524d4231) | [`0x0d1b6583…`](https://testnet.monadvision.com/tx/0x0d1b6583d6294e098d091a86b0994a0bab284420d7c55d0e1665e68dbda391fa) |
+| `giveFeedback` 100 (verifier) | [`0x3c05024a…`](https://monadvision.com/tx/0x3c05024ac5e0f78972734ee68cce1a4bb7126b375d3500a4e6be405f4a81aef6) | [`0xaa0fb56f…`](https://testnet.monadvision.com/tx/0xaa0fb56fdaa77e09c267b60fc171cafd0ac4045145be059d688c22bd99c31d20) |
+
+Read back onchain: `getValidationStatus(proofHash)` returns the verifier, response 100, and the proof hash as `responseHash`. On mainnet the proof hash is `0xad2bca96c12f0a14e7a0377dacc7a7bbfa58e47be0401935c35beba2ab27103d`. `getSummary(agentId, [verifier], "", "")` on the Reputation Registry returns count 1, value 100 on both chains.
+
+## SDK: one call for any agent
+
+An existing agent does not need to adopt the API. Give its executor key to `traceCall` with the call it was going to make:
+
+```ts
+import { traceCall } from "@agenttrace/sdk";
+
+const r = await traceCall({ network: "monad-testnet", signer: process.env.AGENT_KEY, firewallId: 4, target, data });
+// r.executionId, r.txHash, r.proofStatus ("receipt_verified"), r.proofHash, r.proofUrl
+```
+
+It simulates `AgentFirewall.execute` first, so a call the firewall would block throws `FIREWALL_REJECTED` and sends nothing. Then it sends the transaction, reads `AgentAction` from the receipt, and asks AgentTrace to verify the proof. The verdict comes from AgentTrace's own receipt checks, not from the SDK. Runnable example: [`sdk/examples/trace-call.ts`](sdk/examples/trace-call.ts). See [docs/sdk.md](docs/sdk.md).
+
+## Integrations considered
+
+- **Dynamic (wallet onboarding).** Not added. It needs a Dynamic dashboard account to get an environment id (`VITE_DYNAMIC_ENVIRONMENT_ID`); none was created for this project. The app uses the injected browser wallet (EIP-1193) today.
+- **Envio (indexing).** Not added. HyperIndex and HyperSync need an Envio API token, which needs an Envio account. The built-in indexer reads public Monad RPCs in 100-block windows instead.
+- **MetaMask Agent Wallet.** Not added. Its launch networks do not include Monad.
 
 ## Local development
 
@@ -175,14 +266,16 @@ Then register an agent, create a firewall, allow `DemoProtocol.deposit`, and cal
 
 ## Demo
 
-`/demo` walks through identity, firewall, an allowed deposit, proof verification, outcome verification, and a blocked withdraw. It uses the configured Monad testnet contracts and the connected wallet. If those contracts are not deployed, the page says so and does not invent a result. If the RPC cannot be reached, it says the testnet connection is unavailable and offers retry.
+`/demo` walks through identity, firewall, an allowed deposit, proof verification, outcome verification, and a blocked withdraw. It uses the contracts of the network the app was built for (testnet or mainnet) and the connected wallet. If those contracts are not deployed, the page says so and does not invent a result. If the RPC cannot be reached, it says the testnet connection is unavailable and offers retry.
 
 Script: [docs/demo-script.md](docs/demo-script.md). Recording: [docs/demo.mp4](docs/demo.mp4), made against the live app with real testnet transactions (agent #008, firewall #006, deposit [0x19b05db4…](https://testnet.monadvision.com/tx/0x19b05db42e4c2ea0885b0d3f8aa7fa4948a5507d9e3051feadf4067da4db78cd)).
 
 
+Mainnet run on https://agenttrace-mainnet.vercel.app (5 October 2026, real MON): agent [#001](https://agenttrace-mainnet.vercel.app/agents/1) registered ([`0x70fdce44…`](https://monadvision.com/tx/0x70fdce4416844014bc6db40a3150408e1b657dbfb21973acad1efa5c6e661ee2)), firewall [#001](https://agenttrace-mainnet.vercel.app/firewalls/1) created ([`0xfa86ca30…`](https://monadvision.com/tx/0xfa86ca3014e624b4e0edf7c895599234cdf66b4995bd6e3b5725b7ae6790c6de)), DemoProtocol target and `deposit` allowed ([`0x35b10373…`](https://monadvision.com/tx/0x35b103730dc7878b8b79789da1b290316346eb943348f462e975215ca0728eb3), [`0xf5d78baa…`](https://monadvision.com/tx/0xf5d78baad1a35ca9c1e598f733620f2329562304e8682ac27a7a05208df0caf2)), deposit executed ([`0x7db78e77…`](https://monadvision.com/tx/0x7db78e779216bc5d55dd1a957871122ed0d23357e0c5acda7ddbe6401fc4c0c8)), proof [receipt-verified](https://agenttrace-mainnet.vercel.app/proofs/0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e) and anchored ([`0x2151d023…`](https://monadvision.com/tx/0x2151d023a27cc9f1f1aecda0b8dc74ed44e7e9b5936a7b18c5ca2b1127feff08)), outcome `Deposited 100` verified, withdraw blocked by the firewall in simulation (no transaction sent).
+
 ## Screenshots
 
-From the live deployment on Monad testnet. Agent #006 is a complete example: identity, firewall, allowed deposit, verified proof, and verified outcome.
+From the live testnet deployment. Agent #006 is a complete example: identity, firewall, allowed deposit, verified proof, and verified outcome.
 
 | | |
 | --- | --- |
@@ -215,6 +308,7 @@ From the live deployment on Monad testnet. Agent #006 is a complete example: ide
 - [API](docs/api.md)
 - [SDK](docs/sdk.md)
 - [Demo script](docs/demo-script.md)
+- [Demo voiceover](docs/demo-voiceover.md)
 - [Submission notes](docs/submission.md)
 
 ## License
