@@ -69,8 +69,14 @@ async function guarded(target: `0x${string}`, data: `0x${string}`, value = 0n) {
 
 async function callTool(name: string, args: Record<string, unknown>) {
   if (name === "agenttrace_policy") {
-    const response = await fetch(`${appUrl}/api/firewalls/${firewallId}`);
-    if (!response.ok) return text(`Firewall ${firewallId} is not indexed at ${appUrl}.`, true);
+    // A cold app instance may still be catching up on the chain; give it a few tries.
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      response = await fetch(`${appUrl}/api/firewalls/${firewallId}`).catch(() => null);
+      if (response?.ok) break;
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+    }
+    if (!response?.ok) return text(`Firewall ${firewallId} is not indexed at ${appUrl} yet.`, true);
     const { firewall } = (await response.json()) as { firewall: Record<string, any> };
     return text({
       firewallId: firewall.id,

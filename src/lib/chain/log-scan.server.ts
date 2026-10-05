@@ -1,5 +1,6 @@
 import type { Log, PublicClient } from "viem";
 import { logBlockRange } from "@/lib/chain/rpc.server";
+import { hypersyncEnabled, hypersyncLogs } from "@/lib/chain/hypersync.server";
 
 /** Wall-clock budget for one sync call, so a page request never waits on a long catch-up. */
 function scanBudgetMs(): number {
@@ -32,6 +33,26 @@ export async function scanLogs(opts: {
   const deadline = Date.now() + (opts.budgetMs ?? scanBudgetMs());
   let from = opts.from;
   let scannedTo = opts.from - 1;
+  // Envio HyperSync first, when configured: it pages the whole history in a few requests. It can
+  // trail the RPC head by a few blocks; the RPC loop below covers whatever is left, and takes over
+  // entirely if HyperSync fails.
+  if (hypersyncEnabled()) {
+    try {
+      while (from <= opts.latest && Date.now() < deadline) {
+        const page = await hypersyncLogs(opts.address, from, opts.latest);
+        if (page.coveredTo < from) break; // HyperSync has nothing past its archive height yet
+        for (const log of page.logs) {
+          await opts.apply(log);
+          opts.seen?.push(log);
+        }
+        scannedTo = page.coveredTo;
+        from = page.coveredTo + 1;
+        await opts.saveCursor(scannedTo);
+      }
+    } catch (err) {
+      console.warn("[agenttrace-hypersync] falling back to RPC:", err instanceof Error ? err.message : err);
+    }
+  }
   while (from <= opts.latest && Date.now() < deadline) {
     const windows: Array<[number, number]> = [];
     for (let i = 0; i < CONCURRENCY && from <= opts.latest; i++) {

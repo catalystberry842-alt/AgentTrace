@@ -75,6 +75,8 @@ Implemented in this repository:
 - Monad mainnet and testnet from one codebase (`VITE_MONAD_NETWORK`)
 - ERC-8004 integration: link an agent to an ERC-8004 identity, publish proof verdicts to the Validation Registry and outcome verdicts to the Reputation Registry, and serve an ERC-8004 registration file at `/api/erc8004/agents/<agentId>`
 - Owner-only firewall controls: management forms appear only for the connected owner or executor wallet
+- An MCP server that gives any MCP host firewall-guarded onchain tools, with a recorded mainnet session
+- Envio HyperSync log indexing (optional, `ENVIO_API_TOKEN`)
 - `traceCall` in the SDK: one function that routes an agent's call through the firewall and returns its AgentTrace proof
 - Onchain proof anchoring in `AgentProof`: after a proof is receipt-verified, the server verifier commits its proof hash onchain (live on the hosted app)
 - Outcome verification for an expected event, and for Demo Protocol `deposits` or `swapped` when the onchain value matches
@@ -187,10 +189,47 @@ const r = await traceCall({ network: "monad-testnet", signer: process.env.AGENT_
 
 It simulates `AgentFirewall.execute` first, so a call the firewall would block throws `FIREWALL_REJECTED` and sends nothing. Then it sends the transaction, reads `AgentAction` from the receipt, and asks AgentTrace to verify the proof. The verdict comes from AgentTrace's own receipt checks, not from the SDK. Runnable example: [`sdk/examples/trace-call.ts`](sdk/examples/trace-call.ts). A run on testnet on 5 October 2026 (firewall #004, agent #006) sent [`0xfa6772c0…`](https://testnet.monadvision.com/tx/0xfa6772c0ed15a0dc571b3795dcf23a9ba913d7548aae83a77d4dd0043cbceb0b) and returned `proofStatus: "receipt_verified"` for execution [`0x05eb59f6…`](https://agenttrace-plum.vercel.app/proofs/0x05eb59f6cf91d1ce47ece012c044e0df3f8a4205a1c33a962f7089d0c11fa030). See [docs/sdk.md](docs/sdk.md).
 
+## Third-party agent over MCP (mainnet)
+
+[`agents/mcp-firewall/server.ts`](agents/mcp-firewall/server.ts) is a Model Context Protocol server (stdio, no dependencies beyond viem). Any MCP host (Claude Desktop, Cursor, an Eliza or AgentKit runtime) that loads it gets four tools, `agenttrace_policy`, `demo_deposit`, `demo_withdraw`, and `call_contract`, and every write goes through `traceCall`, so the host's model cannot step outside the firewall.
+
+```json
+{ "mcpServers": { "agenttrace": {
+  "command": "npx", "args": ["tsx", "agents/mcp-firewall/server.ts"],
+  "env": { "NETWORK": "monad-mainnet", "AGENT_ID": "2", "FIREWALL_ID": "2", "AGENT_KEY": "<executor key>" }
+} } }
+```
+
+Live setup on Monad mainnet: **Treasury Agent #002**, owned by the deployer, with a separate executor key `0x2551C85252e06989E044Bcb6603135f9dBd11778` (owner and executor are different wallets, as for a real agent). Its firewall #002 allows only `DemoProtocol.deposit` and no value transfers.
+
+| Step | Transaction |
+| --- | --- |
+| Register agent #002 | [`0x2018ec14…`](https://monadvision.com/tx/0x2018ec140c67d39c46649fcac4231db3b63377f30240de4f8a0c0e3e693218bc) |
+| Create firewall #002 (executor = agent key) | [`0x876f56a8…`](https://monadvision.com/tx/0x876f56a85c60ecaeec224ccaa6d5569e2bc729eae56e7ff8f7274352cbd8a74f) |
+| Allow DemoProtocol / allow `deposit` | [`0xdf612a60…`](https://monadvision.com/tx/0xdf612a6060687a4d2a54c94c84e5010efe36be7b0d21de4407da68f9d9c3ee41), [`0xbf0a8495…`](https://monadvision.com/tx/0xbf0a849502448bb2f5191cdb18acfd74e7200a86d5daffb05c7636831fff89b6) |
+
+A scripted MCP session ([`run-session.ts`](agents/mcp-firewall/run-session.ts), transcript in [docs/agent-runs/mcp-mainnet.md](docs/agent-runs/mcp-mainnet.md)) drives the server the way an LLM host would: `initialize`, `tools/list`, then
+
+1. `agenttrace_policy`: reads firewall #002 (one target, one function, value transfers off).
+2. `demo_deposit {amount: 25}`: allowed. Execution [`0x53e92644…`](https://monadvision.com/tx/0x53e92644141f38e31bf3c67a09941a386ca9476fcdf0a1b80c65755c0ad5ff76) came back `receipt_verified` from AgentTrace and was anchored by the verifier in [`0x6d3fda85…`](https://monadvision.com/tx/0x6d3fda85231be2a7f58798157f7e07dc67167b16cd69061825023ea95bb4bfc1). The tool call took 2.1 s end to end in that run. [Proof page](https://agenttrace-mainnet.vercel.app/proofs/0x8361810c1d8b7f3f932a1b8e005dc0cd9d84980432319f540276fde7216ab798).
+3. `demo_withdraw {amount: 25}`: rejected in simulation with `FunctionNotAllowed(2, DemoProtocol, 0x441a3e70)`. Nothing was sent.
+
+```bash
+AGENT_KEY=0x... AGENT_ID=2 FIREWALL_ID=2 NETWORK=monad-mainnet npm run agent:session
+```
+
+## Indexing with Envio HyperSync
+
+When `ENVIO_API_TOKEN` is set (server-only; both hosted apps have it), the indexer reads AgentTrace contract logs from [Envio HyperSync](https://docs.envio.dev/docs/HyperSync/overview) (`monad.hypersync.xyz` for chain 143, `monad-testnet.hypersync.xyz` for 10143) instead of 100-block `eth_getLogs` windows. One HyperSync query returned the full mainnet AgentFirewall history in under half a second in a test from this box. HyperSync can trail the RPC head by a few blocks, so the RPC scanner covers the remainder, and it takes over entirely if HyperSync fails. Proof verification still reads each transaction and receipt from Monad RPC: HyperSync only finds the logs.
+
+The passport's ERC-8004 history (validation responses and outcome feedback posted by the AgentTrace verifier) is also read from HyperSync with topic filters on the agent id, two requests instead of a registry log scan. Code: [`src/lib/chain/hypersync.server.ts`](src/lib/chain/hypersync.server.ts).
+
+A token is free: sign in at [envio.dev/app/api-tokens](https://envio.dev/app/api-tokens) and create one under the Free package. Without it, everything works over public RPC, just slower on a cold start.
+
 ## Integrations considered
 
 - **Dynamic (wallet onboarding).** Not added. It needs a Dynamic dashboard account to get an environment id (`VITE_DYNAMIC_ENVIRONMENT_ID`); none was created for this project. The app uses the injected browser wallet (EIP-1193) today.
-- **Envio (indexing).** Not added. HyperIndex and HyperSync need an Envio API token, which needs an Envio account. The built-in indexer reads public Monad RPCs in 100-block windows instead.
+- **Envio (indexing).** Added: HyperSync is the log source when `ENVIO_API_TOKEN` is set (see above). A full HyperIndex deployment (Postgres + GraphQL) was not needed for this data volume.
 - **MetaMask Agent Wallet.** Not added. Its launch networks do not include Monad.
 
 ## Local development

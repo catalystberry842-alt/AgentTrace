@@ -1,7 +1,8 @@
-import { useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { readableChainError } from "@/lib/format";
+import { MONAD_TESTNET } from "@/lib/chain/network";
 
 export type ButtonVariant = "primary" | "secondary" | "tertiary" | "ghost" | "danger" | "destructive";
 
@@ -288,13 +289,33 @@ export function Mono({ children }: { children: ReactNode }) {
   return <span className="type-technical break-all text-fg">{children}</span>;
 }
 
+/**
+ * Shown under a skeleton only if loading takes more than a moment, so a cold serverless start
+ * reads as "reading the chain" rather than a stalled page. Fast loads never show it.
+ */
+export function ReadingChain({ delayMs = 900 }: { delayMs?: number }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setShow(true), delayMs);
+    return () => clearTimeout(timer);
+  }, [delayMs]);
+  return (
+    <p role="status" className={`mt-6 font-mono text-xs text-faint transition-opacity duration-300 ${show ? "opacity-100" : "opacity-0"}`}>
+      Reading {MONAD_TESTNET.label} · receipts and logs come straight from the chain
+    </p>
+  );
+}
+
 export function SkeletonLines() {
   return (
+    <div>
     <div className="space-y-3" aria-hidden>
       <div className="skeleton h-7 w-40" />
       <div className="skeleton h-4 w-64 max-w-full" />
       <div className="skeleton mt-8 h-12" />
       <div className="skeleton h-12" />
+    </div>
+    <ReadingChain />
     </div>
   );
 }
@@ -305,6 +326,7 @@ export function TableSkeleton({ rows = 4 }: { rows?: number }) {
       {Array.from({ length: rows }, (_, index) => (
         <div key={index} className="skeleton h-14" />
       ))}
+      <ReadingChain />
     </div>
   );
 }
@@ -322,6 +344,7 @@ export function PassportSkeleton() {
       </div>
       <div className="skeleton h-24" />
       <div className="skeleton h-40" />
+      <ReadingChain />
     </div>
   );
 }

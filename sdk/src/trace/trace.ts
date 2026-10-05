@@ -40,6 +40,26 @@ export type TraceNetwork = keyof typeof TRACE_NETWORKS;
 
 const firewallAbi = parseAbi([
   "function execute(uint256 firewallId, address target, uint256 value, bytes data) payable",
+  "error FirewallNotFound(uint256 firewallId)",
+  "error FirewallInactive(uint256 firewallId)",
+  "error FirewallIsPaused(uint256 firewallId)",
+  "error FirewallNotPaused(uint256 firewallId)",
+  "error AgentNotFound(uint256 agentId)",
+  "error AgentInactive(uint256 agentId)",
+  "error UnauthorizedExecutor(uint256 firewallId, address caller)",
+  "error UnauthorizedOwner(uint256 id, address caller)",
+  "error TargetNotAllowed(uint256 firewallId, address target)",
+  "error TargetInactive(uint256 firewallId, address target)",
+  "error FunctionNotAllowed(uint256 firewallId, address target, bytes4 selector)",
+  "error InvalidCalldata()",
+  "error InvalidExecutor()",
+  "error InvalidTarget()",
+  "error ValueTransferDisabled(uint256 firewallId)",
+  "error TransactionValueTooHigh(uint256 firewallId, uint256 value)",
+  "error SpendingLimitExceeded(uint256 firewallId, uint256 value)",
+  "error InvalidPeriod()",
+  "error InvalidPolicy()",
+  "error AttachedValueMismatch(uint256 attached, uint256 declared)",
   "event AgentAction(uint256 indexed agentId, uint256 indexed firewallId, address indexed executor, address target, bytes4 functionSelector, uint256 value, uint256 executionNonce, bytes32 executionId, bytes32 calldataHash, uint64 timestamp)",
 ]);
 
@@ -107,7 +127,11 @@ export async function traceCall(input: TraceCallInput): Promise<TraceCallResult>
     }));
   } catch (error) {
     const revert = error instanceof BaseError ? error.walk((e) => e instanceof ContractFunctionRevertedError) : null;
-    const reason = (error instanceof BaseError ? error.shortMessage : String(error)).split("\n")[0];
+    let reason = (error instanceof BaseError ? error.shortMessage : String(error)).split("\n")[0];
+    if (revert instanceof ContractFunctionRevertedError && revert.data?.errorName) {
+      const args = (revert.data.args ?? []).map((arg) => String(arg)).join(", ");
+      reason = `AgentFirewall reverted with ${revert.data.errorName}(${args}).`;
+    }
     if (revert) {
       throw new AgentTraceError("FIREWALL_REJECTED", `The firewall would reject this call. Nothing was sent. ${reason}`, 403);
     }

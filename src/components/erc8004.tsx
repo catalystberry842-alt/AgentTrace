@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getErc8004Execution, getErc8004Status, linkErc8004, publishErc8004 } from "@/lib/agents/functions";
 import { AGENTTRACE_METADATA_KEY, agentTraceLinkValue, identityRegistryAbi, validationRegistryAbi, type Erc8004Status } from "@/lib/chain/erc8004";
 import { useWalletAccount } from "@/lib/chain/wallet-account";
-import { addressUrl } from "@/lib/format";
+import { addressUrl, formatUtc } from "@/lib/format";
 import { Button, ChainError } from "@/components/ui";
 import { TxValue } from "@/components/values";
 
@@ -91,6 +91,23 @@ export function Erc8004Panel({ agentId, owner }: { agentId: string; owner: strin
             </a>
           </Cell>
         </dl>
+      ) : null}
+      {linked && status.activity && status.activity.length ? (
+        <div className="mt-4">
+          <p className="font-mono text-[11px] tracking-widest text-faint uppercase">Onchain history · indexed with Envio HyperSync</p>
+          <ul className="mt-2 divide-y divide-border border-y border-border">
+            {status.activity.map((item) => (
+              <li key={`${item.kind}-${item.txHash}`} className="grid gap-1 py-2.5 text-sm sm:grid-cols-[10rem_1fr_auto] sm:items-baseline sm:gap-x-6">
+                <span>{item.kind === "validation" ? "Validation response" : "Outcome feedback"}</span>
+                <span className="text-muted">
+                  {item.score != null ? `${item.score}/100 · ` : ""}
+                  {item.timestamp ? formatUtc(new Date(item.timestamp * 1000).toISOString()) : `block ${item.blockNumber}`}
+                </span>
+                <TxValue hash={item.txHash} />
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
       {!status.link && isOwner ? (
         <div className="mt-4">

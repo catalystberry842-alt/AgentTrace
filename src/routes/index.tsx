@@ -7,20 +7,45 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Shell } from "@/components/shell";
 import { buttonClass, EmptyState, ErrorNote, Mono, SkeletonLines, StatusText } from "@/components/ui";
 import { formatAgentId, statusLabel, statusTone } from "@/lib/format";
-import { MONAD_TESTNET } from "@/lib/chain/network";
+import { IS_MAINNET, MONAD_TESTNET } from "@/lib/chain/network";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 const google = GROK_PROVIDERS.find((provider) => provider.idp === "google");
 
-const FLOW = ["Identity", "Control", "Execution", "Proof", "Outcome"] as const;
+const REPO = "https://github.com/catalystberry842-alt/AgentTrace";
 
-const LAYERS = [
-  { title: "Identity", text: "Give every agent a persistent onchain identity." },
-  { title: "Control", text: "Define exactly what an agent is allowed to do." },
-  { title: "Proof", text: "Create independently verifiable evidence of execution." },
-  { title: "Outcome", text: "Verify measurable results." },
+/** Real executions on each network, shown as live examples. */
+const SHOWCASE = IS_MAINNET
+  ? {
+      proof: "0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e",
+      agentProof: "0x8361810c1d8b7f3f932a1b8e005dc0cd9d84980432319f540276fde7216ab798",
+    }
+  : {
+      proof: "0x3242aeadc1ae0b511746852d623e71db91e3a49dbbe27662a886d65260c204df",
+      agentProof: "0x05eb59f6cf91d1ce47ece012c044e0df3f8a4205a1c33a962f7089d0c11fa030",
+    };
+
+const STEPS = [
+  { title: "Identity", text: "A permanent agent id, owned by a wallet.", where: "AgentRegistry" },
+  { title: "Control", text: "Allowed contracts, functions, and value.", where: "AgentFirewall" },
+  { title: "Execution", text: "The call runs only through the firewall.", where: "AgentAction event" },
+  { title: "Proof", text: "Receipt re-checked, hash anchored onchain.", where: "AgentProof" },
+  { title: "Outcome", text: "Did the intended result happen?", where: "ERC-8004 registries" },
 ] as const;
+
+const SNIPPET = `import { traceCall } from "@agenttrace/sdk";
+
+const r = await traceCall({
+  network: "${IS_MAINNET ? "monad-mainnet" : "monad-testnet"}",
+  signer: process.env.AGENT_KEY,   // firewall executor
+  firewallId: 2,
+  target, data,                    // the call your agent makes
+});
+
+r.proofStatus   // "receipt_verified", from AgentTrace
+r.anchorTxHash  // proof hash anchored in AgentProof
+// outside the policy → FIREWALL_REJECTED, nothing sent`;
 
 function Home() {
   const { user, isPending } = useCurrentUserState();
@@ -145,81 +170,119 @@ function Landing({ pending }: { pending: boolean }) {
 
   return (
     <Shell>
-      <section>
-        <h1 className="type-display text-balance">AgentTrace</h1>
-        <p className="mt-4 text-lg text-fg">Every agent leaves a trace.</p>
-        <p className="mt-3 max-w-md text-sm text-pretty text-muted">An independent validator and audit trail for onchain agents on Monad.</p>
-        <p className="mt-3 max-w-sm text-sm text-pretty text-muted">
-          Control what your agents can do.
-          <br />
-          Prove what they actually did.
+      <section className="pt-2">
+        <p className="flex items-center gap-2 font-mono text-xs tracking-widest text-faint uppercase">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-ok" aria-hidden />
+          Live on {MONAD_TESTNET.label} · chain {MONAD_TESTNET.chainId}
+        </p>
+        <h1 className="type-display mt-5 max-w-2xl text-balance">Every agent leaves a trace.</h1>
+        <p className="mt-5 max-w-xl text-base text-pretty text-muted">
+          AgentTrace is an independent validator and audit trail for onchain agents. It limits what an agent may call,
+          proves what it actually did from the Monad receipt, and publishes the verdict to ERC-8004.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Link to="/proofs/$proofId" params={{ proofId: SHOWCASE.proof }} className={primaryClass}>
+            See a verified execution
+          </Link>
+          <Link to="/demo" className={secondaryClass}>
+            Run the demo
+          </Link>
           {pending ? <div className="h-11 w-full animate-pulse rounded-sm bg-subtle sm:w-40" /> : null}
           {!pending && !authEnabled ? (
-            <Link to="/agents/new" className={primaryClass}>
-              Create your first agent
+            <Link to="/agents/new" className={buttonClass("tertiary", "w-full justify-start px-0 sm:w-auto")}>
+              Register an agent
             </Link>
           ) : null}
           {!pending && authEnabled && google ? (
-            <button type="button" disabled={signingIn} onClick={createAgent} className={primaryClass}>
-              {signingIn ? "Continuing…" : "Create your first agent"}
+            <button type="button" disabled={signingIn} onClick={createAgent} className={buttonClass("tertiary", "w-full justify-start px-0 sm:w-auto")}>
+              {signingIn ? "Continuing…" : "Register an agent"}
             </button>
-          ) : null}
-          {!pending ? (
-            <Link to="/agents" className={secondaryClass}>
-              Explore agents
-            </Link>
-          ) : null}
-          {!pending ? (
-            <Link to="/demo" className={buttonClass("tertiary", "w-full justify-start px-0 sm:w-auto")}>
-              Run the demo
-            </Link>
           ) : null}
         </div>
         {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
       </section>
 
-      <ol className="mt-14 flex flex-wrap gap-x-3 gap-y-2 text-sm" aria-label="Infrastructure">
-        {FLOW.map((item, index) => (
-          <li key={item} className="flex items-center gap-3">
-            {index > 0 ? (
-              <span className="text-faint" aria-hidden>
-                →
-              </span>
-            ) : null}
-            <span>{item}</span>
-          </li>
-        ))}
-      </ol>
+      <section className="mt-16 border-t border-border pt-8" aria-labelledby="how">
+        <h2 id="how" className="text-sm font-medium">
+          How one agent action is checked
+        </h2>
+        <ol className="mt-5 grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-5">
+          {STEPS.map((step, index) => (
+            <li key={step.title} className="bg-bg p-4">
+              <p className="font-mono text-[11px] text-faint">{String(index + 1).padStart(2, "0")}</p>
+              <p className="mt-2 text-sm font-medium">{step.title}</p>
+              <p className="mt-1 text-sm text-pretty text-muted">{step.text}</p>
+              <p className="type-technical mt-3 text-xs text-faint">{step.where}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
 
-      <section className="mt-10 grid gap-8 border-t border-border pt-8 sm:grid-cols-2">
-        {LAYERS.map((layer) => (
-          <div key={layer.title}>
-            <h2 className="text-sm font-medium">{layer.title}</h2>
-            <p className="mt-2 text-sm text-pretty text-muted">{layer.text}</p>
+      <section className="mt-14 grid gap-10 border-t border-border pt-8 md:grid-cols-[1fr_1.1fr]" aria-labelledby="any-agent">
+        <div>
+          <h2 id="any-agent" className="text-sm font-medium">
+            Works with agents you already run
+          </h2>
+          <p className="mt-3 text-sm text-pretty text-muted">
+            One SDK call routes an agent's transaction through its firewall and returns the proof. The same call ships as an MCP
+            server, so Claude, Cursor, or any MCP host gets onchain tools that cannot step outside the policy.
+          </p>
+          <p className="mt-3 text-sm text-pretty text-muted">
+            In a scripted MCP session the Treasury Agent read its policy, made a deposit that came back verified and
+            anchored, and was refused a withdraw before anything was sent.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <Link to="/proofs/$proofId" params={{ proofId: SHOWCASE.agentProof }} className="hover:underline">
+              Agent's verified deposit
+            </Link>
+            <a href={`${REPO}/tree/main/agents/mcp-firewall`} className="text-muted hover:text-fg" rel="noreferrer">
+              MCP server
+            </a>
+            <a href={`${REPO}/blob/main/docs/sdk.md`} className="text-muted hover:text-fg" rel="noreferrer">
+              SDK docs
+            </a>
           </div>
-        ))}
+        </div>
+        <pre className="type-technical overflow-x-auto rounded-sm border border-border bg-subtle/40 p-4 text-xs leading-relaxed text-muted">
+          <code>{SNIPPET}</code>
+        </pre>
       </section>
 
-      <section className="mt-14 max-w-xl border-t border-border pt-8">
-        <h2 className="text-sm font-medium">Why AgentTrace</h2>
-        <p className="mt-3 text-sm text-pretty text-muted">
-          AI agents can execute actions, but proving which agent acted, what permissions it had, what it actually executed, and what happened afterward is difficult.
-        </p>
-        <p className="mt-3 text-sm text-pretty text-muted">
-          AgentTrace keeps those answers separate: an onchain identity, a firewall of allowed calls, the execution itself, an independent proof that the execution happened, and a separate check of the outcome.
-        </p>
-        <p className="mt-3 text-sm text-pretty text-muted">
-          Verdicts are posted to the ERC-8004 Validation and Reputation registries, so any wallet, marketplace, or agent can read an agent's verified record without trusting AgentTrace's interface.
-        </p>
-      </section>
-
-      <section className="mt-10 max-w-xl">
-        <h2 className="text-sm font-medium">Why Monad</h2>
-        <p className="mt-3 text-sm text-pretty text-muted">
-          Every check is an onchain transaction. On {MONAD_TESTNET.label} a proof anchor uses 179,045 gas, about 0.018 MON at the 102 gwei price we measured, so anchoring every verified execution is affordable. Blocks finalize after two blocks (about 600 ms, per the Monad docs), so a proof can be written and read back in seconds. The four contracts are ordinary Solidity on chain {MONAD_TESTNET.chainId}; the firewall enforces permissions, not the browser.
-        </p>
+      <section className="mt-14 grid gap-10 border-t border-border pt-8 md:grid-cols-2">
+        <div>
+          <h2 className="text-sm font-medium">Why an independent validator</h2>
+          <p className="mt-3 text-sm text-pretty text-muted">
+            An agent's own logs say what it meant to do. AgentTrace answers four questions from the chain instead: which agent
+            acted, what it was allowed to do, what actually ran, and whether the intended result happened. A successful
+            call and a verified outcome are separate verdicts.
+          </p>
+          <p className="mt-3 text-sm text-pretty text-muted">
+            Verdicts go to the shared ERC-8004 Validation and Reputation registries, so a wallet, marketplace, or other agent can
+            read an agent's record without trusting this interface.
+          </p>
+        </div>
+        <div>
+          <h2 className="text-sm font-medium">Why Monad</h2>
+          <dl className="mt-3 divide-y divide-border border-y border-border text-sm">
+            <div className="flex items-baseline justify-between gap-4 py-2.5">
+              <dt className="text-muted">Proof anchor</dt>
+              <dd>179,045 gas · ≈0.018 MON at 102 gwei</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-4 py-2.5">
+              <dt className="text-muted">Firewall execute</dt>
+              <dd>154,784 gas · ≈0.016 MON</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-4 py-2.5">
+              <dt className="text-muted">Finality</dt>
+              <dd>2 blocks · ≈600 ms (Monad docs)</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-4 py-2.5">
+              <dt className="text-muted">Contracts</dt>
+              <dd className="text-right">4 Solidity contracts on chain {MONAD_TESTNET.chainId}</dd>
+            </div>
+          </dl>
+          <p className="mt-3 text-xs text-faint">Gas from real Monad receipts. Every step is an onchain write, so cost and finality decide whether this is practical.</p>
+        </div>
       </section>
     </Shell>
   );

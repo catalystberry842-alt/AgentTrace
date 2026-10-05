@@ -69,4 +69,6 @@ export type Erc8004Status = {
   link: { erc8004Id: string; owner: string } | null;
   validation: { count: number; average: number } | null;
   outcomes: { count: number; average: number | null } | null;
+  /** Recent ERC-8004 events for this agent from the AgentTrace verifier, via Envio HyperSync (null when not configured). */
+  activity?: Array<{ kind: "validation" | "feedback"; txHash: string; blockNumber: number; timestamp: number | null; score: number | null }> | null;
 };

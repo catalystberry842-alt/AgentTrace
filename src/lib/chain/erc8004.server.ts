@@ -18,6 +18,7 @@ import { MONAD } from "@/lib/chain/network";
 import { getExecutionProof, monadChain, verifierKey } from "@/lib/chain/proof.server";
 import { getOutcomeByExecution } from "@/lib/chain/reputation.server";
 import { monadTransport } from "@/lib/chain/rpc.server";
+import { hypersyncEnabled, hypersyncQuery } from "@/lib/chain/hypersync.server";
 
 /**
  * AgentTrace as an ERC-8004 validator.
@@ -148,6 +149,7 @@ export async function erc8004Status(agentId: string): Promise<Erc8004Status> {
   const [rCount, rValue, rDecimals] = await client.readContract({ address: erc8004.reputation, abi: reputationRegistryAbi, functionName: "getSummary", args: [id, [validator], OUTCOME_TAG, ""] }).catch(() => [0n, 0n, 0] as const);
   return {
     ...base,
+    activity: await erc8004Activity(id, validator).catch(() => null),
     validation: { count: Number(vCount), average: Number(vAvg) },
     outcomes: { count: Number(rCount), average: Number(rCount) ? Number(rValue) / 10 ** Number(rDecimals) : null },
   };
@@ -245,4 +247,39 @@ export async function publishExecution(executionId: string): Promise<PublishResu
 export async function publishedTxs(executionId: string) {
   const txs = await cachedKv(TXS);
   return { validation: txs[`validation:${executionId}`] ?? null, feedback: txs[`feedback:${executionId}`] ?? null };
+}
+
+const VALIDATION_RESPONSE_TOPIC = "0xafddf629e874ccc3963b6a888c477bd464a6c8525024fc88759ea3b2326349ae" as const;
+const NEW_FEEDBACK_TOPIC = "0x6a4a61743519c9d648a14e6493f47dbe3ff1aa29e7785c96c8326a205e58febc" as const;
+
+function topicOf(value: bigint | string): `0x${string}` {
+  const hex = typeof value === "bigint" ? value.toString(16) : value.toLowerCase().replace(/^0x/, "");
+  return `0x${hex.padStart(64, "0")}`;
+}
+
+/**
+ * This agent's ERC-8004 history written by the AgentTrace verifier: validation responses
+ * (topic1 validator, topic2 agentId) and outcome feedback (topic1 agentId, topic2 client).
+ * Read with Envio HyperSync in two requests instead of scanning registry logs over RPC.
+ */
+async function erc8004Activity(erc8004Id: bigint, validator: string): Promise<Erc8004Status["activity"]> {
+  if (!hypersyncEnabled()) return null;
+  const [responses, feedback] = await Promise.all([
+    hypersyncQuery({ address: erc8004.validation, topics: [VALIDATION_RESPONSE_TOPIC, topicOf(validator), topicOf(erc8004Id)] }),
+    hypersyncQuery({ address: erc8004.reputation, topics: [NEW_FEEDBACK_TOPIC, topicOf(erc8004Id), topicOf(validator)] }),
+  ]);
+  const items = [
+    ...responses.map((log) => {
+      let score: number | null = null;
+      try {
+        const decoded = decodeEventLog({ abi: validationRegistryAbi, data: log.data, topics: log.topics, eventName: "ValidationResponse" });
+        score = Number((decoded.args as { response: number }).response);
+      } catch {
+        score = null;
+      }
+      return { kind: "validation" as const, txHash: log.transactionHash as string, blockNumber: Number(log.blockNumber), timestamp: log.timestamp, score };
+    }),
+    ...feedback.map((log) => ({ kind: "feedback" as const, txHash: log.transactionHash as string, blockNumber: Number(log.blockNumber), timestamp: log.timestamp, score: null })),
+  ];
+  return items.sort((a, b) => b.blockNumber - a.blockNumber).slice(0, 10);
 }
