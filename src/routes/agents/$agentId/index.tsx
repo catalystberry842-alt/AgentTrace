@@ -16,7 +16,7 @@ import { Lifecycle, type StageState } from "@/components/lifecycle";
 import { Shell } from "@/components/shell";
 import { Button, ErrorNote, Fact, Mono, Note, NotFoundState, PassportSkeleton, Section, SkeletonLines, StatusText, buttonClass } from "@/components/ui";
 import { AddressValue, CopyButton, TxValue } from "@/components/values";
-import { formatAgentId, formatUtc, formatWei, statusLabel, statusTone } from "@/lib/format";
+import { formatAgentId, formatUtc, formatWei, functionName, statusLabel, statusTone } from "@/lib/format";
 import { Erc8004Panel } from "@/components/erc8004";
 
 export const Route = createFileRoute("/agents/$agentId/")({ component: AgentRoute });
@@ -365,6 +365,14 @@ function AgentProfile({ agent }: { agent: IndexedAgent }) {
       ) : (
         <div className="h-20 animate-pulse rounded-sm bg-subtle" aria-hidden />
       )}
+      <section className="mt-10" aria-labelledby="erc8004-title">
+        <h2 id="erc8004-title" className="text-sm font-medium">
+          Public reputation <span className="font-normal text-muted">· ERC-8004</span>
+        </h2>
+        <div className="mt-3">
+          <Erc8004Panel agentId={agent.agentId} owner={agent.owner} />
+        </div>
+      </section>
       <div className="mt-10 grid gap-x-10 md:grid-cols-[1.3fr_1fr_1fr]">
         <div id="identity">
           <Section title="Identity">
@@ -383,9 +391,6 @@ function AgentProfile({ agent }: { agent: IndexedAgent }) {
               </Fact>
             ) : null}
           </dl>
-        </Section>
-        <Section title="ERC-8004">
-          <Erc8004Panel agentId={agent.agentId} owner={agent.owner} />
         </Section>
         </div>
         <Section title="Control">
@@ -435,7 +440,8 @@ function AgentProfile({ agent }: { agent: IndexedAgent }) {
               {executions.slice(0, 5).map((row) => (
                 <li key={row.id} className="grid gap-1 py-3 text-sm md:grid-cols-4 md:items-center">
                   <Link to="/proofs/$proofId" params={{ proofId: row.id }} className="hover:underline">
-                    <Mono>{row.action}</Mono>
+                    <Mono>{functionName(row.action)?.split("(")[0] ?? row.action}</Mono>
+                    <span className="ml-2 text-xs text-muted">View proof</span>
                   </Link>
                   <span className="text-muted">{formatWei(row.value)}</span>
                   <span className="text-muted">{formatUtc(row.timestamp)}</span>

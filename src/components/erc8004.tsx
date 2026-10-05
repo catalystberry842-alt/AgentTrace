@@ -3,7 +3,7 @@ import { getErc8004Execution, getErc8004Status, linkErc8004, publishErc8004 } fr
 import { AGENTTRACE_METADATA_KEY, agentTraceLinkValue, identityRegistryAbi, validationRegistryAbi, type Erc8004Status } from "@/lib/chain/erc8004";
 import { useWalletAccount } from "@/lib/chain/wallet-account";
 import { addressUrl } from "@/lib/format";
-import { Button, ChainError, Fact } from "@/components/ui";
+import { Button, ChainError } from "@/components/ui";
 import { TxValue } from "@/components/values";
 
 function ExplorerLink({ href, children }: { href: string | null; children: React.ReactNode }) {
@@ -54,35 +54,46 @@ export function Erc8004Panel({ agentId, owner }: { agentId: string; owner: strin
     }
   }
 
-  if (!status) return <div className="h-16 animate-pulse rounded-sm bg-subtle" aria-hidden />;
+  if (!status) {
+    return (
+      <div className="grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-4" aria-hidden>
+        {[0, 1, 2, 3].map((n) => (
+          <div key={n} className="bg-bg p-4">
+            <div className="h-3 w-20 animate-pulse rounded-sm bg-subtle" />
+            <div className="mt-3 h-4 w-28 animate-pulse rounded-sm bg-subtle" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  const linked = Boolean(status.link);
   return (
     <div>
-      <dl>
-        <Fact label="Identity">
-          {status.link ? (
-            <ExplorerLink href={addressUrl(status.registries.identity)}>ERC-8004 #{status.link.erc8004Id}</ExplorerLink>
-          ) : (
-            "Not linked"
-          )}
-        </Fact>
-        {status.link ? (
-          <>
-            <Fact label="Validations">
-              {status.validation?.count ? `${status.validation.count} by AgentTrace · average ${status.validation.average}/100` : "None yet"}
-            </Fact>
-            <Fact label="Outcomes">
-              {status.outcomes?.count ? `${status.outcomes.count} reported · average ${status.outcomes.average}/100` : "None yet"}
-            </Fact>
-            <Fact label="Agent card">
-              <a href={`/api/erc8004/agents/${agentId}`} className="hover:underline">
-                Registration file
-              </a>
-            </Fact>
-          </>
-        ) : null}
-      </dl>
+      <p className="max-w-2xl text-sm text-pretty text-muted">
+        {linked
+          ? "This agent's verified record is published to the shared ERC-8004 registries on Monad. Any wallet, marketplace, or agent can read it onchain without trusting AgentTrace."
+          : "Not linked to ERC-8004 yet. Once linked, AgentTrace publishes each verified proof and outcome to the shared ERC-8004 registries, where anyone can read them onchain."}
+      </p>
+      {linked && status.link ? (
+        <dl className="mt-4 grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-4">
+          <Cell label="Identity">
+            <ExplorerLink href={addressUrl(status.registries.identity)}>#{status.link.erc8004Id}</ExplorerLink>
+          </Cell>
+          <Cell label="Validations" hint="Proofs AgentTrace verified">
+            {status.validation?.count ? `${status.validation.count} · ${status.validation.average}/100` : "None yet"}
+          </Cell>
+          <Cell label="Outcome feedback" hint="Reputation registry">
+            {status.outcomes?.count ? `${status.outcomes.count} · ${status.outcomes.average}/100` : "None yet"}
+          </Cell>
+          <Cell label="Agent card">
+            <a href={`/api/erc8004/agents/${agentId}`} className="hover:underline">
+              Registration file
+            </a>
+          </Cell>
+        </dl>
+      ) : null}
       {!status.link && isOwner ? (
-        <div className="mt-3">
+        <div className="mt-4">
           <Button type="button" variant="secondary" disabled={Boolean(busy)} onClick={() => void register()}>
             {busy ?? "Register on ERC-8004"}
           </Button>
@@ -90,6 +101,16 @@ export function Erc8004Panel({ agentId, owner }: { agentId: string; owner: strin
         </div>
       ) : null}
       {error ? <ChainError raw={error} /> : null}
+    </div>
+  );
+}
+
+function Cell({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-bg p-4">
+      <dt className="font-mono text-[11px] tracking-widest text-faint uppercase">{label}</dt>
+      <dd className="mt-2 text-sm text-fg">{children}</dd>
+      {hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
     </div>
   );
 }
@@ -146,28 +167,47 @@ export function Erc8004Validation({ executionId, txHash, owner }: { executionId:
   const responded = state.request?.responded;
   return (
     <section className="mt-10">
-      <h2 className="text-sm font-medium">ERC-8004</h2>
-      <dl className="mt-3">
-        <Fact label="Identity">{link ? `ERC-8004 #${link.erc8004Id}` : "Agent not linked"}</Fact>
-        <Fact label="Validation">
-          {!link
-            ? "Link the agent to ERC-8004 to request validation."
-            : responded
-              ? `AgentTrace responded ${state.request?.response}/100 · responseHash = proof hash`
-              : state.request
-                ? "Requested. Waiting for AgentTrace."
-                : "Not requested"}
-        </Fact>
-        {state.txs.validation ? (
-          <Fact label="Response tx">
-            <TxValue hash={state.txs.validation} copy />
-          </Fact>
-        ) : null}
-        {state.txs.feedback ? (
-          <Fact label="Outcome feedback">
-            <TxValue hash={state.txs.feedback} copy />
-          </Fact>
-        ) : null}
+      <h2 className="text-sm font-medium">Published to ERC-8004</h2>
+      <p className="mt-2 max-w-2xl text-sm text-pretty text-muted">
+        {!link
+          ? "This agent is not linked to an ERC-8004 identity, so the verdict is not published."
+          : responded
+            ? "AgentTrace's verifier posted this verdict to the shared ERC-8004 Validation Registry, keyed by the proof hash. Anyone can read it onchain."
+            : state.request
+              ? "Validation was requested. Waiting for the AgentTrace verifier to respond onchain."
+              : "Not yet published. The agent owner can request validation; the AgentTrace verifier then answers onchain."}
+      </p>
+      <dl className="mt-4 grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-3">
+        <Cell label="Identity">{link ? `ERC-8004 #${link.erc8004Id}` : "Not linked"}</Cell>
+        <Cell label="Validation">
+          {responded ? (
+            <span className="text-ok">{state.request?.response}/100 · responseHash = proof hash</span>
+          ) : state.request ? (
+            "Requested"
+          ) : (
+            "Not requested"
+          )}
+        </Cell>
+        <Cell label="Transactions">
+          {state.txs.validation || state.txs.feedback ? (
+            <span className="grid gap-1">
+              {state.txs.validation ? (
+                <span>
+                  <span className="text-muted">Response </span>
+                  <TxValue hash={state.txs.validation} />
+                </span>
+              ) : null}
+              {state.txs.feedback ? (
+                <span>
+                  <span className="text-muted">Feedback </span>
+                  <TxValue hash={state.txs.feedback} />
+                </span>
+              ) : null}
+            </span>
+          ) : (
+            "—"
+          )}
+        </Cell>
       </dl>
       {link && isOwner && state.anchored && !responded ? (
         <Button type="button" variant="secondary" className="mt-3" disabled={Boolean(busy)} onClick={() => void request()}>

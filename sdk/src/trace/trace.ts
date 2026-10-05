@@ -57,6 +57,8 @@ export type TraceCallInput = {
   appUrl?: string;
   /** How long to wait for the AgentTrace verifier (ms). Default 60s. */
   verifyTimeoutMs?: number;
+  /** Ask the AgentTrace verifier to anchor the proof hash onchain in AgentProof. Default true. */
+  anchor?: boolean;
 };
 
 export type TraceCallResult = {
@@ -65,6 +67,8 @@ export type TraceCallResult = {
   agentId: bigint;
   proofStatus: string | null;
   proofHash: Hex | null;
+  /** AgentProof.anchorProof transaction sent by the AgentTrace verifier, when anchored. */
+  anchorTxHash: Hex | null;
   proofUrl: string;
   explorerUrl: string;
 };
@@ -150,8 +154,22 @@ export async function traceCall(input: TraceCallInput): Promise<TraceCallResult>
     await new Promise((resolve) => setTimeout(resolve, 3_000));
   }
 
+  let anchorTxHash: Hex | null = null;
+  if (proofStatus === "receipt_verified" && input.anchor !== false) {
+    const response = await fetch(`${appUrl}/api/proofs/${executionId}/anchor`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ transactionHash: txHash }),
+    }).catch(() => null);
+    if (response?.ok) {
+      const body = (await response.json()) as { anchored?: boolean; txHash?: Hex | null };
+      if (body.anchored && body.txHash) anchorTxHash = body.txHash;
+    }
+  }
+
   return {
     txHash,
+    anchorTxHash,
     executionId,
     agentId,
     proofStatus,

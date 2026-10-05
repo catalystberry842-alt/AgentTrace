@@ -427,6 +427,34 @@ async function verifyExecutionOnce(executionId: string, force = false): Promise<
   }
 }
 
+/**
+ * Settle the proofs a page is about to show. A cold instance replays AgentAction logs but has no
+ * verdicts yet; without this the page would say "no verified executions" until someone opened
+ * each proof. Verification re-reads the receipt from Monad (no verdict is copied). Bounded by a
+ * time budget so a slow RPC never blocks the page; anything left settles on the next load.
+ */
+export async function settleProofsFor(executionIds: string[], budgetMs = 3_500): Promise<void> {
+  const ids = [...new Set(executionIds.map((id) => id.toLowerCase()))].filter((id) => /^0x[a-f0-9]{64}$/.test(id));
+  if (!ids.length) return;
+  const sql = await getSql();
+  const rows = await sql<{ execution_id: string }>`
+    select execution_id from execution_proofs
+    where chain_id = ${MONAD_TESTNET.chainId}
+      and permanent = false
+      and verification_status in ('executed', 'requested', 'temporary_error')
+  `;
+  const wanted = new Set(ids);
+  const pending = rows.map((row) => row.execution_id.toLowerCase()).filter((id) => wanted.has(id)).slice(0, 12);
+  if (!pending.length) return;
+  const deadline = Date.now() + budgetMs;
+  const work = (async () => {
+    for (let i = 0; i < pending.length && Date.now() < deadline; i += 3) {
+      await Promise.all(pending.slice(i, i + 3).map((id) => verifyIndexedExecution(id, true).catch(() => null)));
+    }
+  })();
+  await Promise.race([work, new Promise((resolve) => setTimeout(resolve, budgetMs))]);
+}
+
 export async function settlePendingProofs(limit = 1): Promise<void> {
   const sql = await getSql();
   const rows = await sql<{ execution_id: string }>`

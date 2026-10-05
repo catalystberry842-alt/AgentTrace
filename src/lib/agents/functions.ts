@@ -35,6 +35,7 @@ import {
   listExecutionProofs,
   listProofsForAgent,
   settlePendingProofs,
+  settleProofsFor,
   verifyIndexedExecution,
 } from "@/lib/chain/proof.server";
 import {
@@ -408,7 +409,11 @@ export const getAgentLayers = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const firewallIndexer = await syncFirewallSafe();
     const firewalls = /^[1-9]\d*$/.test(data) ? await listFirewallsByAgent(data) : [];
-    const actions = /^[1-9]\d*$/.test(data) ? await listActionsByAgent(data) : [];
+    let actions = /^[1-9]\d*$/.test(data) ? await listActionsByAgent(data) : [];
+    if (actions.some((action) => action.proofStatus !== "receipt_verified")) {
+      await settleProofsFor(actions.slice(0, 12).map((action) => action.executionId));
+      actions = await listActionsByAgent(data);
+    }
     const proofs = /^[1-9]\d*$/.test(data) ? await listProofsForAgent(data, true) : [];
     const reputation = /^[1-9]\d*$/.test(data) ? await deriveAgentReputation(data) : null;
     const timeline = reputation ? await listAgentTimeline(data, 8) : [];
@@ -505,7 +510,11 @@ export const listFirewalls = createServerFn({ method: "GET" }).handler(async () 
 export const listProofs = createServerFn({ method: "GET" }).handler(async () => {
   await syncFirewallSafe();
   await settlePendingProofs(1);
-  const proofs = await listExecutionProofs(100);
+  let proofs = await listExecutionProofs(100);
+  if (proofs.some((proof) => proof.verificationStatus !== "receipt_verified" && proof.verificationStatus !== "unverifiable")) {
+    await settleProofsFor(proofs.slice(0, 12).map((proof) => proof.executionId));
+    proofs = await listExecutionProofs(100);
+  }
   return {
     proofs,
     detail: proofs.length
@@ -585,7 +594,12 @@ export const getFirewall = createServerFn({ method: "GET" })
         detail: "This firewall is not indexed.",
       };
     }
-    return { firewall, actions: await listFirewallActions(data), detail: "" };
+    let actions = await listFirewallActions(data);
+    if (actions.some((action) => action.proofStatus !== "receipt_verified")) {
+      await settleProofsFor(actions.slice(0, 12).map((action) => action.executionId));
+      actions = await listFirewallActions(data);
+    }
+    return { firewall, actions, detail: "" };
   });
 
 export const listConfigurableAgents = createServerFn({ method: "GET" })

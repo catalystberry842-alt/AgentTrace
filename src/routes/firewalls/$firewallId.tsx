@@ -8,7 +8,7 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Shell } from "@/components/shell";
 import { AddressInput, AmountInput, Button, ChainError, Checkbox, CodeInput, ConfirmDialog, ErrorNote, Fact, Field, Mono, SkeletonLines, StatusText, TextInput } from "@/components/ui";
 import { AddressValue, CopyButton, TxValue } from "@/components/values";
-import { addressUrl, formatAgentId, formatDuration, formatWei, proofStatusLabel, statusTone } from "@/lib/format";
+import { addressUrl, formatAgentId, formatDuration, formatWei, functionName, proofStatusLabel, shortHash, statusTone } from "@/lib/format";
 import { toFunctionSelector } from "viem";
 import { toast } from "sonner";
 import { useWalletAccount } from "@/lib/chain/wallet-account";
@@ -104,10 +104,16 @@ function Record({
       <header>
         <p className="font-mono text-xs tracking-widest text-faint">FIREWALL</p>
         <h1 className="mt-2 text-2xl font-medium tracking-tight">Firewall {formatAgentId(firewall.id)}</h1>
-        <p className="mt-3 max-w-xl text-sm text-muted">What is this agent allowed to do?</p>
         <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
           <StatusText tone={statusTone(firewall.status)}>{status}</StatusText>
-          <CopyButton value={firewall.id} label="firewall id" />
+          <span aria-hidden>·</span>
+          <span>
+            {targets.length} {targets.length === 1 ? "target" : "targets"} · {functions.length}{" "}
+            {functions.length === 1 ? "function" : "functions"} · value transfers {firewall.allowValueTransfer ? "on" : "off"}
+          </span>
+        </p>
+        <p className="mt-3 max-w-xl text-sm text-pretty text-muted">
+          The onchain rules for this agent. AgentFirewall rejects any call outside them before it reaches the target.
         </p>
       </header>
 
@@ -120,7 +126,6 @@ function Record({
         <Fact label="Executor">
           <AddressValue value={firewall.executor} copy explorer />
         </Fact>
-        <Fact label="Status">{status}</Fact>
         {firewall.creationTxHash ? (
           <Fact label="Created in">
             <TxValue hash={firewall.creationTxHash} copy />
@@ -131,16 +136,14 @@ function Record({
       <section className="mt-10">
         <h2 className="text-sm font-medium">Policy</h2>
         <dl className="mt-3 border-t border-border">
-          <Fact label="Value transfers">{firewall.allowValueTransfer ? "Allowed" : "Disabled"}</Fact>
-          <Fact label="Maximum transaction value">
-            {firewall.allowValueTransfer ? formatWei(firewall.maxValuePerTransaction) : "Value transfer disabled"}
-          </Fact>
-          <Fact label="Maximum period spend">
-            {firewall.allowValueTransfer
-              ? `${formatWei(firewall.maxValuePerPeriod)} / ${formatDuration(firewall.periodDuration)}`
-              : "Value transfer disabled"}
-          </Fact>
-          <Fact label="Spent in period">{formatWei(firewall.spentInPeriod)}</Fact>
+          <Fact label="Value transfers">{firewall.allowValueTransfer ? "Allowed" : "Disabled. Calls cannot send MON."}</Fact>
+          {firewall.allowValueTransfer ? (
+            <>
+              <Fact label="Per transaction">{formatWei(firewall.maxValuePerTransaction)}</Fact>
+              <Fact label="Per period">{`${formatWei(firewall.maxValuePerPeriod)} / ${formatDuration(firewall.periodDuration)}`}</Fact>
+              <Fact label="Spent this period">{formatWei(firewall.spentInPeriod)}</Fact>
+            </>
+          ) : null}
         </dl>
       </section>
 
@@ -173,8 +176,13 @@ function Record({
           <ul className="mt-3 divide-y divide-border border-y border-border">
             {functions.map((rule) => (
               <li key={`${rule.target}-${rule.selector}`} className="py-3 text-sm">
-                <Mono>{rule.selector}</Mono>
-                <span className="mt-1 block break-all text-muted">{rule.target}</span>
+                <span className="flex flex-wrap items-baseline gap-x-3">
+                  <Mono>{functionName(rule.selector) ?? rule.selector}</Mono>
+                  {functionName(rule.selector) ? <span className="type-technical text-xs text-faint">{rule.selector}</span> : null}
+                </span>
+                <span className="mt-1 block break-all text-muted">
+                  {targets.find((t) => t.target.toLowerCase() === rule.target.toLowerCase())?.name || rule.target}
+                </span>
               </li>
             ))}
           </ul>
@@ -190,19 +198,16 @@ function Record({
         ) : (
           <ul className="mt-3 divide-y divide-border border-y border-border">
             {actions.map((action) => (
-              <li key={action.executionId} className="grid gap-1 py-3 text-sm">
-                <Link to="/proofs/$proofId" params={{ proofId: action.executionId }} className="hover:underline">
-                  <Mono>{action.executionId}</Mono>
+              <li key={action.executionId} className="grid gap-1 py-3 text-sm sm:grid-cols-[1fr_auto] sm:items-baseline sm:gap-x-6">
+                <Link to="/proofs/$proofId" params={{ proofId: action.executionId }} className="min-w-0 hover:underline">
+                  <Mono>{functionName(action.selector)?.split("(")[0] ?? action.selector}</Mono>
+                  <span className="ml-3 text-muted">{shortHash(action.executionId)}</span>
                 </Link>
-                <span className="text-muted">
-                  <Mono>{action.selector}</Mono>
-                  {" · "}
-                  {formatWei(action.value)}
-                  {" · "}
-                  <TxValue hash={action.txHash} />
-                </span>
-                <span className="text-muted">
+                <StatusText tone={action.proofStatus === "receipt_verified" ? "ok" : action.proofStatus === "unverifiable" ? "danger" : "muted"}>
                   {action.proofStatus ? proofStatusLabel(action.proofStatus, action.anchored) : "No proof"}
+                </StatusText>
+                <span className="text-xs text-muted sm:col-span-2">
+                  {formatWei(action.value)} · <TxValue hash={action.txHash} />
                 </span>
               </li>
             ))}

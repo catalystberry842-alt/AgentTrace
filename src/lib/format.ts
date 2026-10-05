@@ -28,14 +28,36 @@ export function formatAgentLabel(id: string | null | undefined): string {
   return compact === "—" ? compact : `Agent ${compact}`;
 }
 
+/** Exact amounts: MON with up to 6 decimals when the value is a whole number of micro-MON, otherwise wei. */
 export function formatWei(value: string | null | undefined): string {
   if (value == null || !/^\d+$/.test(value)) return "—";
-  return `${value} wei`;
+  const wei = BigInt(value);
+  if (wei === 0n) return "0 MON";
+  const micro = 10n ** 12n;
+  if (wei % micro !== 0n) return `${value} wei`;
+  const whole = wei / 10n ** 18n;
+  const frac = ((wei % 10n ** 18n) / micro).toString().padStart(6, "0").replace(/0+$/, "");
+  return `${whole}${frac ? `.${frac}` : ""} MON`;
 }
 
 export function formatDuration(seconds: string | null | undefined): string {
   if (!seconds || !/^\d+$/.test(seconds)) return "—";
+  const n = Number(seconds);
+  if (n % 86400 === 0) return n === 86400 ? "day" : `${n / 86400} days`;
+  if (n % 3600 === 0) return n === 3600 ? "hour" : `${n / 3600} hours`;
   return `${seconds}s`;
+}
+
+const KNOWN_FUNCTIONS: Record<string, string> = {
+  "0xe2bbb158": "deposit(uint256,uint256)",
+  "0x441a3e70": "withdraw(uint256,uint256)",
+  "0x9d9892cd": "swap(uint256,uint256,uint256)",
+};
+
+/** Readable name for a DemoProtocol selector; null for anything else (shown as the raw selector). */
+export function functionName(selector: string | null | undefined): string | null {
+  if (!selector) return null;
+  return KNOWN_FUNCTIONS[selector.toLowerCase()] ?? null;
 }
 
 export function shortHash(value: string | null | undefined): string {
