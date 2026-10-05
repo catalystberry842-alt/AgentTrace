@@ -30,21 +30,51 @@ const sections = readFileSync("docs/demo-voiceover.md", "utf8")
 // MCP transcript rendered as a plain dark page (content is the real recorded session).
 const transcript = readFileSync("docs/agent-runs/mcp-mainnet.md", "utf8");
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+function renderTranscript(md) {
+  // Minimal Markdown: "## " headings become sections, ``` fences become code blocks.
+  const out = [];
+  let inCode = false;
+  let section = 0;
+  for (const line of md.split("\n")) {
+    if (line.startsWith("```")) {
+      out.push(inCode ? "</pre>" : "<pre>");
+      inCode = !inCode;
+      continue;
+    }
+    if (inCode) {
+      out.push(
+        esc(line)
+          .replace(/"allowed": true/g, '<span class="ok">"allowed": true</span>')
+          .replace(/"receipt_verified"/g, '<span class="ok">"receipt_verified"</span>')
+          .replace(/FIREWALL_REJECTED|FunctionNotAllowed\([^)]*\)/g, (m) => `<span class="no">${m}</span>`),
+      );
+      continue;
+    }
+    if (line.startsWith("# ")) continue;
+    if (line.startsWith("## ")) {
+      section += 1;
+      out.push(`<h2 id="call${section}">${esc(line.slice(3)).replace(/`([^`]+)`/g, "<code>$1</code>")}</h2>`);
+      continue;
+    }
+    if (line.trim()) out.push(`<p>${esc(line.replace(/^> /, "")).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>")}</p>`);
+  }
+  return out.join("\n");
+}
 writeFileSync(
   join(WORK, "mcp.html"),
   `<!doctype html><meta charset="utf-8"><style>
-  body{margin:0;background:#0b0b0c;color:#d8d8d8;font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace}
-  main{max-width:980px;margin:0 auto;padding:56px 48px 400px}
-  h1{font:500 22px/1.3 system-ui,sans-serif;color:#f2f2f2;margin:0 0 4px}
-  .sub{color:#8a8a8a;font:13px system-ui,sans-serif;margin-bottom:28px}
-  pre{white-space:pre-wrap;word-break:break-all;margin:0}
-  .ok{color:#8eae96}.no{color:#c98a8a}
+  body{margin:0;background:#0b0b0c;color:#cfcfcf;font:15px/1.6 system-ui,sans-serif}
+  main{max-width:960px;margin:0 auto;padding:56px 48px 700px}
+  h1{font-weight:500;font-size:22px;color:#f2f2f2;margin:0 0 4px}
+  h2{font-weight:500;font-size:16px;color:#f2f2f2;margin:36px 0 6px;padding-top:20px;border-top:1px solid #222}
+  .sub{color:#8a8a8a;font-size:13px;margin-bottom:24px}
+  p{margin:6px 0;color:#a9a9a9} b{color:#c98a8a;font-weight:500}
+  code{font:13px ui-monospace,Menlo,monospace;color:#e0e0e0}
+  pre{font:13px/1.55 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all;background:#111113;border:1px solid #222;border-radius:4px;padding:14px 16px;margin:10px 0}
+  .ok{color:#8eae96}.no{color:#d39a9a}
   </style><main><h1>AgentTrace MCP server · scripted client session</h1>
   <div class="sub">Monad mainnet · Treasury Agent #002 · firewall #002 · real transactions</div>
-  <pre>${esc(transcript)
-    .replace(/(&quot;|")allowed(&quot;|")\s*:\s*true/g, '<span class="ok">"allowed": true</span>')
-    .replace(/"receipt_verified"/g, '<span class="ok">"receipt_verified"</span>')
-    .replace(/FIREWALL_REJECTED|FunctionNotAllowed\([^)]*\)/g, (m) => `<span class="no">${m}</span>`)}</pre></main>`,
+  ${renderTranscript(transcript)}</main>`,
 );
 
 // Scene picture: URL plus the text anchors to scroll to, spread across the narration.
@@ -55,7 +85,7 @@ const SCENES = [
   { url: `/proofs/${EXEC}`, anchors: [null, "Verification", "Anchor"] },
   { url: `/proofs/${EXEC}`, anchors: ["Anchor", "Published to ERC-8004"] },
   { url: `/outcomes/${EXEC}`, anchors: [null] },
-  { url: `file://${WORK}/mcp.html`, anchors: [null, "demo_deposit", "demo_withdraw"] },
+  { url: `file://${WORK}/mcp.html`, anchors: [null, "#call2", "#call3"] },
   { url: "/", anchors: ["Why an independent validator"] },
 ];
 if (SCENES.length !== sections.length) throw new Error(`${sections.length} sections but ${SCENES.length} scenes`);
@@ -78,7 +108,7 @@ function captions(text, duration, lead) {
     const words = sentence.trim().split(" ");
     let line = "";
     for (const word of words) {
-      if ((line + " " + word).trim().length > 90) {
+      if ((line + " " + word).trim().length > 84) {
         chunks.push(line.trim());
         line = "";
       }
@@ -132,6 +162,11 @@ for (let i = 0; i < sections.length; i++) {
   const scrollTo = async (anchor) => {
     await page.evaluate((label) => {
       if (!label) return window.scrollTo({ top: 0, behavior: "smooth" });
+      if (label.startsWith("#")) {
+        const target = document.querySelector(label);
+        if (target) window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 60, behavior: "smooth" });
+        return;
+      }
       const el = [...document.querySelectorAll("h1,h2,h3,p,dt,span,div")].find((node) => node.childElementCount <= 2 && node.textContent?.trim().startsWith(label));
       if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" });
     }, anchor);
@@ -159,7 +194,7 @@ for (let i = 0; i < sections.length; i++) {
     "-ss", start.toFixed(2), "-t", duration.toFixed(2), "-i", video,
     "-i", audio,
     "-filter_complex",
-    `[0:v]fps=30,scale=${W}:${H},subtitles=${srt}:force_style='FontName=DejaVu Sans,FontSize=15,PrimaryColour=&H00F2F2F2,OutlineColour=&H00000000,BorderStyle=3,Outline=6,BackColour=&H99000000,MarginV=28'[v];` +
+    `[0:v]fps=30,scale=${W}:${H},subtitles=${srt}:force_style='FontName=DejaVu Sans,FontSize=10,PrimaryColour=&H00F2F2F2,OutlineColour=&H00000000,BorderStyle=3,Outline=6,BackColour=&H99000000,MarginV=18'[v];` +
       `[1:a]adelay=${Math.round(LEAD * 1000)}:all=1,apad[a]`,
     "-map", "[v]", "-map", "[a]", "-t", duration.toFixed(2),
     "-c:v", "libx264", "-preset", "medium", "-crf", "22", "-pix_fmt", "yuv420p",

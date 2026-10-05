@@ -21,7 +21,9 @@ const result = await traceCall({
 3. Reads `AgentAction` from the receipt for the execution id.
 4. Calls `POST /api/proofs/<executionId>/verify` on the AgentTrace app with the transaction hash as a hint, so the server reads that receipt itself even if its indexer is behind. It repeats until a verdict or the timeout (60 s by default).
 
-Returns `{ txHash, executionId, agentId, proofStatus, proofHash, proofUrl, explorerUrl }`. `proofStatus` is the server's verdict (`receipt_verified` or `unverifiable`), or null if no verdict arrived in time. The SDK never marks a proof verified itself.
+5. If the proof is `receipt_verified` and `anchor` is not false, asks the AgentTrace verifier to anchor the proof hash in `AgentProof`.
+
+Returns `{ txHash, executionId, agentId, proofStatus, proofHash, anchorTxHash, proofUrl, explorerUrl }`. A firewall rejection names the contract's custom error, for example `FunctionNotAllowed(2, 0x1664…, 0x441a3e70)`. `proofStatus` is the server's verdict (`receipt_verified` or `unverifiable`), or null if no verdict arrived in time. The SDK never marks a proof verified itself.
 
 Example: [`sdk/examples/trace-call.ts`](../sdk/examples/trace-call.ts). A run on testnet on 5 October 2026 (firewall #004, agent #006) sent [`0xfa6772c0…`](https://testnet.monadvision.com/tx/0xfa6772c0ed15a0dc571b3795dcf23a9ba913d7548aae83a77d4dd0043cbceb0b) and returned `proofStatus: "receipt_verified"` for execution [`0x05eb59f6…`](https://agenttrace-plum.vercel.app/proofs/0x05eb59f6cf91d1ce47ece012c044e0df3f8a4205a1c33a962f7089d0c11fa030).
 
@@ -74,3 +76,7 @@ client.webhooks.verifySignature(rawBody, signatureHeader, secret);
 ```
 
 The header value is `sha256=<hex>`.
+
+## MCP server
+
+`agents/mcp-firewall/server.ts` wraps `traceCall` as a Model Context Protocol server, so any MCP host gets firewall-guarded tools. See the README section "Third-party agent over MCP".

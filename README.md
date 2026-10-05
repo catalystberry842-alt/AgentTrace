@@ -6,7 +6,7 @@ An independent validator and audit trail for onchain agents on Monad.
 
 An agent that holds a wallet can call anything. AgentTrace gives every agent call four separate, checkable facts: which agent acted (identity), what it was allowed to do (an onchain firewall), what actually executed (a receipt-verified proof anchored onchain), and whether the intended result happened (outcome verification). Verdicts are published to the ERC-8004 Validation and Reputation registries, so any wallet, marketplace, or other agent can read them without trusting this app. Live on Monad mainnet and testnet.
 
-**Live app (mainnet, chain 143):** https://agenttrace-mainnet.vercel.app · **Live app (testnet, chain 10143):** https://agenttrace-plum.vercel.app · **Demo video:** [docs/demo.mp4](docs/demo.mp4) (82 s, real Monad testnet transactions) · **Submission notes:** [docs/submission.md](docs/submission.md)
+**Live app (mainnet, chain 143):** https://agenttrace-mainnet.vercel.app · **Live app (testnet, chain 10143):** https://agenttrace-plum.vercel.app · **Demo video:** [docs/demo.mp4](docs/demo.mp4) (narrated, recorded on the live mainnet app) · **Submission notes:** [docs/submission.md](docs/submission.md)
 
 ## Overview
 
@@ -307,23 +307,23 @@ Then register an agent, create a firewall, allow `DemoProtocol.deposit`, and cal
 
 `/demo` walks through identity, firewall, an allowed deposit, proof verification, outcome verification, and a blocked withdraw. It uses the contracts of the network the app was built for (testnet or mainnet) and the connected wallet. If those contracts are not deployed, the page says so and does not invent a result. If the RPC cannot be reached, it says the testnet connection is unavailable and offers retry.
 
-Script: [docs/demo-script.md](docs/demo-script.md). Recording: [docs/demo.mp4](docs/demo.mp4), made against the live app with real testnet transactions (agent #008, firewall #006, deposit [0x19b05db4…](https://testnet.monadvision.com/tx/0x19b05db42e4c2ea0885b0d3f8aa7fa4948a5507d9e3051feadf4067da4db78cd)).
+Video: [docs/demo.mp4](docs/demo.mp4), narrated with captions, recorded on the live mainnet app over real executions (agent #001, firewall #001, the Treasury Agent MCP session). It is generated from [docs/demo-voiceover.md](docs/demo-voiceover.md) by `node scripts/make-demo-video.mjs` (Playwright recording, free edge-tts narration, ffmpeg). Walkthrough script for a live wallet run: [docs/demo-script.md](docs/demo-script.md).
 
 
 Mainnet run on https://agenttrace-mainnet.vercel.app (5 October 2026, real MON): agent [#001](https://agenttrace-mainnet.vercel.app/agents/1) registered ([`0x70fdce44…`](https://monadvision.com/tx/0x70fdce4416844014bc6db40a3150408e1b657dbfb21973acad1efa5c6e661ee2)), firewall [#001](https://agenttrace-mainnet.vercel.app/firewalls/1) created ([`0xfa86ca30…`](https://monadvision.com/tx/0xfa86ca3014e624b4e0edf7c895599234cdf66b4995bd6e3b5725b7ae6790c6de)), DemoProtocol target and `deposit` allowed ([`0x35b10373…`](https://monadvision.com/tx/0x35b103730dc7878b8b79789da1b290316346eb943348f462e975215ca0728eb3), [`0xf5d78baa…`](https://monadvision.com/tx/0xf5d78baad1a35ca9c1e598f733620f2329562304e8682ac27a7a05208df0caf2)), deposit executed ([`0x7db78e77…`](https://monadvision.com/tx/0x7db78e779216bc5d55dd1a957871122ed0d23357e0c5acda7ddbe6401fc4c0c8)), proof [receipt-verified](https://agenttrace-mainnet.vercel.app/proofs/0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e) and anchored ([`0x2151d023…`](https://monadvision.com/tx/0x2151d023a27cc9f1f1aecda0b8dc74ed44e7e9b5936a7b18c5ca2b1127feff08)), outcome `Deposited 100` verified, withdraw blocked by the firewall in simulation (no transaction sent).
 
 ## Screenshots
 
-From the live testnet deployment. Agent #006 is a complete example: identity, firewall, allowed deposit, verified proof, and verified outcome.
+From the live mainnet app (https://agenttrace-mainnet.vercel.app), captured with `node scripts/readme-screenshots.mjs`.
 
 | | |
 | --- | --- |
 | ![Landing](docs/screenshots/01-landing.png) | ![Agent passport](docs/screenshots/02-agent-passport.png) |
-| Landing | Agent passport (#006) |
-| ![Demo run](docs/screenshots/03-demo-live-run.png) | ![Execution proof](docs/screenshots/04-execution-proof.png) |
-| `/demo` after a live run: deposit verified, withdraw blocked | Execution proof with every receipt check |
-| ![Firewall](docs/screenshots/05-firewall.png) | ![Agents](docs/screenshots/06-agents.png) |
-| Firewall #004 policy | Agents list (deactivated test agents hidden) |
+| Landing | Agent #001 passport: lifecycle, ERC-8004 public reputation with HyperSync history |
+| ![Execution proof](docs/screenshots/03-execution-proof.png) | ![Firewall](docs/screenshots/04-firewall.png) |
+| Execution proof: evidence, 14 receipt checks, anchor, ERC-8004 publication | Firewall #001: readable policy and execution history |
+| ![MCP agent proof](docs/screenshots/05-mcp-agent-proof.png) | ![Outcome](docs/screenshots/06-outcome.png) |
+| Treasury Agent #002's deposit from the MCP session, verified and anchored | Outcome check in plain language |
 
 ## Security
 
