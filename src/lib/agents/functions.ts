@@ -119,7 +119,7 @@ async function readRegistrationTx(
   const registry = configuredRegistry();
   if (!registry) throw new Error("Agent Registry is not deployed. No transaction was sent.");
   const tx = await findTransaction(txHash);
-  if (!tx) throw new Error("Transaction was not found on Monad testnet.");
+  if (!tx) throw new Error(`Transaction was not found on ${MONAD_TESTNET.label}.`);
   if (!tx.to || tx.to.toLowerCase() !== registry) {
     throw new Error("Transaction does not call the Agent Registry.");
   }
@@ -847,4 +847,61 @@ export const verifyDemoDeposit = createServerFn({ method: "POST" })
       evidence: body.evidence ?? "",
       reason: body.reason ?? "",
     };
+  });
+
+// --- ERC-8004 -------------------------------------------------------------------------------
+
+export const getErc8004Status = createServerFn({ method: "GET" })
+  .validator((agentId: string) => agentId)
+  .handler(async ({ data }) => {
+    if (!/^[1-9]\d*$/.test(data)) throw new Error("Invalid agent id.");
+    await syncRegistrySafe();
+    const { erc8004Status } = await import("@/lib/chain/erc8004.server");
+    return erc8004Status(data);
+  });
+
+export const linkErc8004 = createServerFn({ method: "POST" })
+  .validator((input: { agentId: string; txHash?: string; erc8004Id?: string }) => {
+    if (!/^[1-9]\d*$/.test(String(input?.agentId ?? ""))) throw new Error("Invalid agent id.");
+    const txHash = input.txHash?.trim().toLowerCase();
+    if (txHash && !/^0x[a-f0-9]{64}$/.test(txHash)) throw new Error("Invalid transaction hash.");
+    const erc8004Id = input.erc8004Id?.trim();
+    if (erc8004Id && !/^\d+$/.test(erc8004Id)) throw new Error("Invalid ERC-8004 agent id.");
+    if (!txHash && !erc8004Id) throw new Error("A registration transaction or an ERC-8004 agent id is required.");
+    return { agentId: input.agentId, txHash: txHash as `0x${string}` | undefined, erc8004Id };
+  })
+  .handler(async ({ data }) => {
+    await syncRegistrySafe();
+    const { linkFromRegistration, linkExisting } = await import("@/lib/chain/erc8004.server");
+    return data.txHash ? linkFromRegistration(data.agentId, data.txHash) : linkExisting(data.agentId, data.erc8004Id!);
+  });
+
+/** Post the AgentTrace validation response and outcome feedback for one execution, if due. */
+export const publishErc8004 = createServerFn({ method: "POST" })
+  .validator(parseExecutionRef)
+  .handler(async ({ data }) => {
+    await ensureExecutionIndexed(data.id, data.txHash);
+    await verifyIndexedExecution(data.id, true);
+    const { publishExecution } = await import("@/lib/chain/erc8004.server");
+    return publishExecution(data.id);
+  });
+
+export const getErc8004Execution = createServerFn({ method: "GET" })
+  .validator((executionId: string) => executionId.trim().toLowerCase())
+  .handler(async ({ data }) => {
+    if (!/^0x[a-f0-9]{64}$/.test(data)) throw new Error("Invalid execution id.");
+    const proof = await getExecutionProof(data);
+    if (!proof) return null;
+    const { erc8004Status, publishedTxs } = await import("@/lib/chain/erc8004.server");
+    const { erc8004, validationRegistryAbi } = await import("@/lib/chain/erc8004");
+    const status = await erc8004Status(proof.agentId);
+    let request: { validator: string; response: number; responded: boolean } | null = null;
+    if (status.link && proof.proofHash) {
+      const { getPublicClient } = await import("@/lib/chain/indexer.server");
+      const row = await getPublicClient()
+        .readContract({ address: erc8004.validation, abi: validationRegistryAbi, functionName: "getValidationStatus", args: [proof.proofHash as `0x${string}`] })
+        .catch(() => null);
+      if (row) request = { validator: row[0].toLowerCase(), response: Number(row[2]), responded: row[3] !== `0x${"00".repeat(32)}` };
+    }
+    return { status, request, txs: await publishedTxs(data), proofHash: proof.proofHash, anchored: proof.anchored };
   });

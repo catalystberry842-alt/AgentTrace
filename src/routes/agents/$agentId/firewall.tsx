@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { MONAD_TESTNET } from "@/lib/chain/network";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { getAgentLayers, getChainStatus, getFirewall, getPublicAgent, refreshFirewallIntent, submitFirewall } from "@/lib/agents/functions";
 import type { FirewallAction, FirewallIntentStatus, FirewallRecord, IndexedAgent } from "@/lib/agents/types";
@@ -559,7 +560,7 @@ function CreateFirewall({ agent, onCreated }: { agent: IndexedAgent; onCreated: 
             <Fact label="Functions">None yet. Added after this transaction.</Fact>
             <Fact label="Value">{allowValue ? `Up to ${txLimit} wei per transaction` : "Value transfer disabled"}</Fact>
             <Fact label="Period">{allowValue ? `${periodLimit} wei per ${period} seconds` : `${period} seconds`}</Fact>
-            <Fact label="Network">Monad testnet</Fact>
+            <Fact label="Network">{MONAD_TESTNET.label}</Fact>
           </dl>
           <p className="mt-4 max-w-md text-sm text-muted">Creating the firewall does not allow any contract. The contract is the authority for every later action.</p>
         </div>

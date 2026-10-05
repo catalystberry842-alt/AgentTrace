@@ -4,7 +4,7 @@ import { DeveloperNav } from "@/components/developer-nav";
 import { Shell } from "@/components/shell";
 import { Mono } from "@/components/ui";
 import { CAPABILITIES } from "@/lib/agents/types";
-import { deployment } from "@/lib/chain/deployment";
+import { deployment } from "@/lib/chain/active-deployment";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { WEBHOOK_EVENTS } from "@/lib/developer/events";
 

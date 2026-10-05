@@ -32,6 +32,8 @@ type CacheDoc = {
   chainId: number;
   contracts: Record<string, ContractEntry>;
   outcomeRequests?: OutcomeRequest[];
+  /** Small public string maps, e.g. ERC-8004 links and the transactions that posted to them. */
+  kv?: Record<string, Record<string, string>>;
 };
 
 const PATHNAME = `agenttrace/chain-cache-${MONAD_TESTNET.chainId}.json`;
@@ -48,6 +50,8 @@ type State = {
   requests: OutcomeRequest[];
   requestsReadAt: number;
   logsReadAt?: Record<string, number>;
+  kv?: Record<string, Record<string, string>>;
+  kvReadAt?: number;
 };
 const slot = globalThis as typeof globalThis & { __agenttraceChainCache?: State };
 function state(): State {
@@ -206,7 +210,8 @@ async function flush(): Promise<void> {
     for (const [key, entry] of Object.entries(s.pending))
       contracts[key] = mergeEntry(contracts[key], entry);
     const outcomeRequests = mergeRequests(remote?.outcomeRequests, s.requests);
-    const doc: CacheDoc = { version: 1, chainId: MONAD_TESTNET.chainId, contracts, outcomeRequests };
+    const kv = mergeKv(remote?.kv, s.kv);
+    const doc: CacheDoc = { version: 1, chainId: MONAD_TESTNET.chainId, contracts, outcomeRequests, kv };
     await put(PATHNAME, JSON.stringify(doc), {
       access: "private",
       addRandomSuffix: false,
@@ -219,6 +224,7 @@ async function flush(): Promise<void> {
       s.pending[key] = entry;
     }
     s.requests = outcomeRequests;
+    s.kv = kv;
     s.dirty = false;
     s.lastFlushAt = Date.now();
   } catch (err) {
@@ -264,4 +270,33 @@ export async function cachedContractLogs(key: string): Promise<Log[]> {
     if (entry) s.pending[key] = mergeEntry(s.pending[key], entry);
   }
   return (s.pending[key]?.logs ?? []).map(fromCached);
+}
+
+function mergeKv(
+  a: Record<string, Record<string, string>> = {},
+  b: Record<string, Record<string, string>> = {},
+): Record<string, Record<string, string>> {
+  const out: Record<string, Record<string, string>> = {};
+  for (const name of new Set([...Object.keys(a), ...Object.keys(b)])) out[name] = { ...(a[name] ?? {}), ...(b[name] ?? {}) };
+  return out;
+}
+
+/** Read one public string map shared by all instances (re-read from the blob at most once a minute). */
+export async function cachedKv(name: string): Promise<Record<string, string>> {
+  if (!chainCacheEnabled()) return state().kv?.[name] ?? {};
+  const s = state();
+  if (Date.now() - (s.kvReadAt ?? 0) >= 60_000) {
+    s.kvReadAt = Date.now();
+    const remote = await readRemote();
+    s.kv = mergeKv(remote?.kv, s.kv);
+  }
+  return s.kv?.[name] ?? {};
+}
+
+/** Record one public value (an id or a transaction hash). Flushes to the blob. */
+export async function recordKv(name: string, key: string, value: string): Promise<void> {
+  const s = state();
+  s.kv = mergeKv(s.kv, { [name]: { [key]: value } });
+  if (!chainCacheEnabled()) return;
+  await flush();
 }

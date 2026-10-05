@@ -130,7 +130,7 @@ export async function postAgent(request: Request): Promise<Response> {
       status: "confirmed",
     });
   } catch {
-    return apiError(503, "CHAIN_UNAVAILABLE", "Monad testnet could not be read. Nothing was confirmed.");
+    return apiError(503, "CHAIN_UNAVAILABLE", `${MONAD_TESTNET.label} could not be read. Nothing was confirmed.`);
   }
 }
 

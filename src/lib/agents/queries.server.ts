@@ -1,6 +1,6 @@
 import { getSql } from "@/lib/db";
 import { configuredDemoProtocol } from "@/lib/chain/addresses.server";
-import { deployment } from "@/lib/chain/deployment";
+import { deployment } from "@/lib/chain/active-deployment";
 import {
   configuredDeployBlock,
   configuredRegistry,

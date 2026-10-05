@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Erc8004Validation } from "@/components/erc8004";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { anchorProof, getProof, verifyProof } from "@/lib/agents/functions";
 import type { ProofRecord } from "@/lib/agents/types";
@@ -373,6 +374,7 @@ function Record({
         ) : null}
         {anchorNote ? <p className="mt-3 text-sm text-muted">{anchorNote}</p> : null}
       </section>
+      <Erc8004Validation executionId={proof.executionId} txHash={proof.txHash} owner={proof.executor} />
     </article>
   );
 }

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { DeveloperNav } from "@/components/developer-nav";
 import { Shell } from "@/components/shell";
 import { Mono } from "@/components/ui";
-import { deployment } from "@/lib/chain/deployment";
+import { deployment } from "@/lib/chain/active-deployment";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 
 export const Route = createFileRoute("/developers/sandbox")({ component: SandboxPage });

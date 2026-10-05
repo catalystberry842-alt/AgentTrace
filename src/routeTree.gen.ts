@@ -72,6 +72,7 @@ import { Route as ApiV1ExecutionsExecutionIdRouteImport } from './routes/api/v1/
 import { Route as ApiV1FirewallsIndexRouteImport } from './routes/api/v1/firewalls/index'
 import { Route as ApiV1WebhooksIndexRouteImport } from './routes/api/v1/webhooks/index'
 import { Route as ApiV1WebhooksWebhookIdRouteImport } from './routes/api/v1/webhooks/$webhookId'
+import { Route as ApiErc8004AgentsAgentIdIndexRouteImport } from './routes/api/erc8004/agents/$agentId/index'
 import { Route as ApiV1FirewallsFirewallIdIndexRouteImport } from './routes/api/v1/firewalls/$firewallId/index'
 import { Route as ApiV1FirewallsFirewallIdExecuteRouteImport } from './routes/api/v1/firewalls/$firewallId/execute'
 import { Route as ApiV1FirewallsFirewallIdFunctionsRouteImport } from './routes/api/v1/firewalls/$firewallId/functions'
@@ -415,6 +416,12 @@ const ApiV1WebhooksWebhookIdRoute = ApiV1WebhooksWebhookIdRouteImport.update({
   path: '/api/v1/webhooks/$webhookId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiErc8004AgentsAgentIdIndexRoute =
+  ApiErc8004AgentsAgentIdIndexRouteImport.update({
+    id: '/api/erc8004/agents/$agentId/',
+    path: '/api/erc8004/agents/$agentId/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiV1FirewallsFirewallIdIndexRoute =
   ApiV1FirewallsFirewallIdIndexRouteImport.update({
     id: '/api/v1/firewalls/$firewallId/',
@@ -533,6 +540,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/firewalls/$firewallId/targets': typeof ApiV1FirewallsFirewallIdTargetsRoute
   '/api/v1/outcomes/$executionId/verify': typeof ApiV1OutcomesExecutionIdVerifyRoute
   '/api/v1/proofs/$executionId/verify': typeof ApiV1ProofsExecutionIdVerifyRoute
+  '/api/erc8004/agents/$agentId/': typeof ApiErc8004AgentsAgentIdIndexRoute
   '/api/v1/firewalls/$firewallId/': typeof ApiV1FirewallsFirewallIdIndexRoute
   '/api/v1/outcomes/$executionId/': typeof ApiV1OutcomesExecutionIdIndexRoute
   '/api/v1/proofs/$executionId/': typeof ApiV1ProofsExecutionIdIndexRoute
@@ -606,6 +614,7 @@ export interface FileRoutesByTo {
   '/api/v1/firewalls/$firewallId/targets': typeof ApiV1FirewallsFirewallIdTargetsRoute
   '/api/v1/outcomes/$executionId/verify': typeof ApiV1OutcomesExecutionIdVerifyRoute
   '/api/v1/proofs/$executionId/verify': typeof ApiV1ProofsExecutionIdVerifyRoute
+  '/api/erc8004/agents/$agentId': typeof ApiErc8004AgentsAgentIdIndexRoute
   '/api/v1/firewalls/$firewallId': typeof ApiV1FirewallsFirewallIdIndexRoute
   '/api/v1/outcomes/$executionId': typeof ApiV1OutcomesExecutionIdIndexRoute
   '/api/v1/proofs/$executionId': typeof ApiV1ProofsExecutionIdIndexRoute
@@ -680,6 +689,7 @@ export interface FileRoutesById {
   '/api/v1/firewalls/$firewallId/targets': typeof ApiV1FirewallsFirewallIdTargetsRoute
   '/api/v1/outcomes/$executionId/verify': typeof ApiV1OutcomesExecutionIdVerifyRoute
   '/api/v1/proofs/$executionId/verify': typeof ApiV1ProofsExecutionIdVerifyRoute
+  '/api/erc8004/agents/$agentId/': typeof ApiErc8004AgentsAgentIdIndexRoute
   '/api/v1/firewalls/$firewallId/': typeof ApiV1FirewallsFirewallIdIndexRoute
   '/api/v1/outcomes/$executionId/': typeof ApiV1OutcomesExecutionIdIndexRoute
   '/api/v1/proofs/$executionId/': typeof ApiV1ProofsExecutionIdIndexRoute
@@ -755,6 +765,7 @@ export interface FileRouteTypes {
     | '/api/v1/firewalls/$firewallId/targets'
     | '/api/v1/outcomes/$executionId/verify'
     | '/api/v1/proofs/$executionId/verify'
+    | '/api/erc8004/agents/$agentId/'
     | '/api/v1/firewalls/$firewallId/'
     | '/api/v1/outcomes/$executionId/'
     | '/api/v1/proofs/$executionId/'
@@ -828,6 +839,7 @@ export interface FileRouteTypes {
     | '/api/v1/firewalls/$firewallId/targets'
     | '/api/v1/outcomes/$executionId/verify'
     | '/api/v1/proofs/$executionId/verify'
+    | '/api/erc8004/agents/$agentId'
     | '/api/v1/firewalls/$firewallId'
     | '/api/v1/outcomes/$executionId'
     | '/api/v1/proofs/$executionId'
@@ -901,6 +913,7 @@ export interface FileRouteTypes {
     | '/api/v1/firewalls/$firewallId/targets'
     | '/api/v1/outcomes/$executionId/verify'
     | '/api/v1/proofs/$executionId/verify'
+    | '/api/erc8004/agents/$agentId/'
     | '/api/v1/firewalls/$firewallId/'
     | '/api/v1/outcomes/$executionId/'
     | '/api/v1/proofs/$executionId/'
@@ -974,6 +987,7 @@ export interface RootRouteChildren {
   ApiV1FirewallsFirewallIdTargetsRoute: typeof ApiV1FirewallsFirewallIdTargetsRoute
   ApiV1OutcomesExecutionIdVerifyRoute: typeof ApiV1OutcomesExecutionIdVerifyRoute
   ApiV1ProofsExecutionIdVerifyRoute: typeof ApiV1ProofsExecutionIdVerifyRoute
+  ApiErc8004AgentsAgentIdIndexRoute: typeof ApiErc8004AgentsAgentIdIndexRoute
   ApiV1FirewallsFirewallIdIndexRoute: typeof ApiV1FirewallsFirewallIdIndexRoute
   ApiV1OutcomesExecutionIdIndexRoute: typeof ApiV1OutcomesExecutionIdIndexRoute
   ApiV1ProofsExecutionIdIndexRoute: typeof ApiV1ProofsExecutionIdIndexRoute
@@ -1422,6 +1436,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1WebhooksWebhookIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/erc8004/agents/$agentId/': {
+      id: '/api/erc8004/agents/$agentId/'
+      path: '/api/erc8004/agents/$agentId'
+      fullPath: '/api/erc8004/agents/$agentId/'
+      preLoaderRoute: typeof ApiErc8004AgentsAgentIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/firewalls/$firewallId/': {
       id: '/api/v1/firewalls/$firewallId/'
       path: '/api/v1/firewalls/$firewallId'
@@ -1562,6 +1583,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiV1FirewallsFirewallIdTargetsRoute: ApiV1FirewallsFirewallIdTargetsRoute,
   ApiV1OutcomesExecutionIdVerifyRoute: ApiV1OutcomesExecutionIdVerifyRoute,
   ApiV1ProofsExecutionIdVerifyRoute: ApiV1ProofsExecutionIdVerifyRoute,
+  ApiErc8004AgentsAgentIdIndexRoute: ApiErc8004AgentsAgentIdIndexRoute,
   ApiV1FirewallsFirewallIdIndexRoute: ApiV1FirewallsFirewallIdIndexRoute,
   ApiV1OutcomesExecutionIdIndexRoute: ApiV1OutcomesExecutionIdIndexRoute,
   ApiV1ProofsExecutionIdIndexRoute: ApiV1ProofsExecutionIdIndexRoute,

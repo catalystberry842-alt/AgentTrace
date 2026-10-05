@@ -3,7 +3,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { defineChain } from "viem";
 import { getSql, type Sql } from "@/lib/db";
 import { agentProofAbi, agentRegistryAbi } from "@/lib/chain/abi";
-import { deployment } from "@/lib/chain/deployment";
+import { deployment } from "@/lib/chain/active-deployment";
 import { readAddress } from "@/lib/chain/addresses.server";
 import { configuredFirewall } from "@/lib/chain/firewall.server";
 import { configuredRegistry, getPublicClient } from "@/lib/chain/indexer.server";
@@ -36,7 +36,7 @@ async function agentExistsOnChain(agentId: string, indexed: boolean): Promise<bo
   }
 }
 
-function monadChain() {
+export function monadChain() {
   return defineChain({
     id: MONAD_TESTNET.chainId,
     name: MONAD_TESTNET.name,
@@ -55,7 +55,7 @@ export function configuredProofDeployBlock(): number | null {
   return deployment.proofDeployBlock;
 }
 
-function verifierKey(): `0x${string}` | null {
+export function verifierKey(): `0x${string}` | null {
   const key = process.env.AGENT_PROOF_VERIFIER_PRIVATE_KEY?.trim() ?? "";
   if (!/^0x[a-fA-F0-9]{64}$/.test(key)) return null;
   return key as `0x${string}`;

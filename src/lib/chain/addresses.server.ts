@@ -1,4 +1,4 @@
-import { deployment } from "@/lib/chain/deployment";
+import { deployment } from "@/lib/chain/active-deployment";
 
 /** One reader for public contract addresses. Env overrides the deployment record. Never invent an address. */
 export function readAddress(fallback: `0x${string}` | null, ...envNames: string[]): `0x${string}` | null {

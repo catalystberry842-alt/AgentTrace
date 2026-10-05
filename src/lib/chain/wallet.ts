@@ -69,7 +69,7 @@ async function ensureMonad(eth: EthereumProvider): Promise<void> {
   }
   const after = await eth.request({ method: "eth_chainId" });
   if (typeof after !== "string" || after.toLowerCase() !== MONAD_TESTNET.chainIdHex) {
-    throw new Error("Wallet is not on Monad testnet.");
+    throw new Error(`Wallet is not on ${MONAD_TESTNET.label}.`);
   }
 }
 
@@ -224,4 +224,25 @@ export async function sendFirewallTransaction(input: {
     throw chainRevert(err);
   }
   return signer.signTransaction({ to: input.to, data, value: input.value });
+}
+
+/**
+ * Simulate and send any contract call from the connected wallet (used for the ERC-8004
+ * registries). The wallet shows the call; nothing is signed without the user's approval.
+ */
+export async function sendContractTransaction(input: {
+  to: `0x${string}`;
+  abi: readonly unknown[];
+  functionName: string;
+  args: readonly unknown[];
+}): Promise<`0x${string}`> {
+  const signer = await getSigner();
+  const data = (encodeFunctionData as (p: unknown) => `0x${string}`)({ abi: input.abi, functionName: input.functionName, args: input.args });
+  const client = createPublicClient({ chain: monadChain, transport: custom(provider()) });
+  try {
+    await client.call({ account: await signer.getAddress(), to: input.to, data });
+  } catch (err) {
+    throw chainRevert(err);
+  }
+  return signer.signTransaction({ to: input.to, data });
 }

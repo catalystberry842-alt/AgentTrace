@@ -526,7 +526,7 @@ function DemoPage() {
       {configured === null ? <div className="mt-10"><SkeletonLines /></div> : null}
       {configured === false && gateNote === "rpc" ? (
         <div className="mt-8 max-w-xl">
-          <p className="text-sm text-muted">Monad Testnet connection unavailable.</p>
+          <p className="text-sm text-muted">{MONAD_TESTNET.name} connection unavailable.</p>
           <Button type="button" className="mt-4" variant="secondary" onClick={() => setGateRetry((value) => value + 1)}>
             Retry
           </Button>
@@ -534,7 +534,7 @@ function DemoPage() {
       ) : null}
       {configured === false && gateNote === "missing" ? (
         <p className="mt-8 max-w-xl text-sm text-muted">
-          Agent Registry, Agent Firewall, and Demo Protocol are not deployed on Monad testnet. No transaction will be sent and no result will be invented.
+          Agent Registry, Agent Firewall, and Demo Protocol are not deployed on {MONAD_TESTNET.label}. No transaction will be sent and no result will be invented.
         </p>
       ) : null}
 

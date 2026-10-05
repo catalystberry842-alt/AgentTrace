@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { MONAD_TESTNET } from "@/lib/chain/network";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { TxStatus } from "@/components/tx-status";
 import { CAPABILITIES, type Capability, type IntentStatus } from "@/lib/agents/types";
@@ -250,7 +251,7 @@ function CreateFlow() {
             <Review label="Description" value={description.trim()} />
             <Review label="Capabilities" value={capabilities.join(" · ")} />
             <Review label="Metadata" value={metadataURI.trim() || "None"} />
-            <Review label="Network" value="Monad testnet" />
+            <Review label="Network" value={MONAD_TESTNET.label} />
             <Review label="Owner" value="The wallet that signs this transaction. Not your Google account." />
           </dl>
           <p className="mt-6 max-w-md text-sm text-muted">This action will create a persistent Agent ID. It cannot be reused if the agent is later deactivated.</p>
@@ -284,7 +285,7 @@ function CreateFlow() {
           void create();
         }}
       >
-        <p>Network: Monad testnet</p>
+        <p>Network: {MONAD_TESTNET.label}</p>
         <p className="mt-2">Agent: {name.trim() || "Unnamed"}</p>
       </ConfirmDialog>
     </div>

@@ -1,4 +1,5 @@
 import { ChainError, Status } from "@/components/ui";
+import { MONAD_TESTNET } from "@/lib/chain/network";
 import { TxValue } from "@/components/values";
 import { readableChainError, txUrl } from "@/lib/format";
 
@@ -37,7 +38,7 @@ export function TxStatus({
 
   return (
     <div>
-      <p className="type-caption text-faint">Monad testnet</p>
+      <p className="type-caption text-faint">{MONAD_TESTNET.label}</p>
       <h1 className="type-heading mt-2 md:text-3xl">{title}</h1>
       {phase === "failed" ? (
         <div className="mt-6">

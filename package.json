@@ -14,6 +14,7 @@
     "build": "node scripts/with-app-env.mjs vite build && node scripts/copy-pglite-assets.mjs && npm run db:migrate",
     "db:migrate": "node scripts/migrate.mjs",
     "deploy:testnet": "node scripts/deploy-contracts.mjs",
+    "deploy:mainnet": "MONAD_NETWORK=mainnet node scripts/deploy-contracts.mjs --confirm-mainnet",
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
     "preview": "node scripts/with-app-env.mjs vite preview",
     "preview:restart": "node scripts/preview.mjs restart",

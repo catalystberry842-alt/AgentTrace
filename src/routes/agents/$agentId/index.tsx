@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MONAD_TESTNET } from "@/lib/chain/network";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   attachRegistrationTx,
@@ -16,6 +17,7 @@ import { Shell } from "@/components/shell";
 import { Button, ErrorNote, Fact, Mono, Note, NotFoundState, PassportSkeleton, Section, SkeletonLines, StatusText, buttonClass } from "@/components/ui";
 import { AddressValue, CopyButton, TxValue } from "@/components/values";
 import { formatAgentId, formatUtc, formatWei, statusLabel, statusTone } from "@/lib/format";
+import { Erc8004Panel } from "@/components/erc8004";
 
 export const Route = createFileRoute("/agents/$agentId/")({ component: AgentRoute });
 
@@ -371,7 +373,7 @@ function AgentProfile({ agent }: { agent: IndexedAgent }) {
               <AddressValue value={agent.owner} copy explorer />
             </Fact>
             <Fact label="Capabilities">{agent.capabilities.length ? agent.capabilities.join(" · ") : "None recorded."}</Fact>
-            <Fact label="Network">Monad testnet</Fact>
+            <Fact label="Network">{MONAD_TESTNET.label}</Fact>
             <Fact label="Created">
               <span className="whitespace-nowrap">{formatUtc(agent.registeredAt)}</span>
             </Fact>
@@ -381,6 +383,9 @@ function AgentProfile({ agent }: { agent: IndexedAgent }) {
               </Fact>
             ) : null}
           </dl>
+        </Section>
+        <Section title="ERC-8004">
+          <Erc8004Panel agentId={agent.agentId} owner={agent.owner} />
         </Section>
         </div>
         <Section title="Control">

@@ -8,7 +8,7 @@ import {
 import { defineChain } from "viem";
 import { getSql, type Sql } from "@/lib/db";
 import { agentRegistryAbi } from "@/lib/chain/abi";
-import { deployment } from "@/lib/chain/deployment";
+import { deployment } from "@/lib/chain/active-deployment";
 import { readAddress } from "@/lib/chain/addresses.server";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { monadRpcUrl, monadTransport } from "@/lib/chain/rpc.server";

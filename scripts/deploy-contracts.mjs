@@ -1,10 +1,12 @@
 /**
- * Deploy AgentRegistry, AgentFirewall, AgentProof and DemoProtocol to Monad testnet (10143)
- * and write the confirmed addresses to src/lib/chain/deployment.ts.
+ * Deploy AgentRegistry, AgentFirewall, AgentProof and DemoProtocol to Monad and write the
+ * confirmed addresses to the deployment record.
  *
- *   MONAD_DEPLOYER_PRIVATE_KEY=0x... npm run deploy:testnet
+ *   MONAD_DEPLOYER_PRIVATE_KEY=0x... npm run deploy:testnet     # chain 10143 -> src/lib/chain/deployment.ts
+ *   MONAD_DEPLOYER_PRIVATE_KEY=0x... npm run deploy:mainnet     # chain 143   -> src/lib/chain/deployment-mainnet.ts
  *
- * - Refuses any chain other than 10143. No mainnet deploys from this script.
+ * - Mainnet spends real MON, so it runs only with MONAD_NETWORK=mainnet and --confirm-mainnet.
+ * - Refuses an RPC whose chain id does not match the selected network.
  * - Checks the deployer balance against an estimate before sending anything.
  * - A contract already present in deployment.ts (with bytecode on chain) is skipped, so a
  *   partial run can be resumed. The record is written after each confirmed deployment.
@@ -25,8 +27,17 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 
 const root = join(import.meta.dirname, "..");
-const recordPath = join(root, "src/lib/chain/deployment.ts");
-const CHAIN_ID = 10143;
+const MAINNET = process.env.MONAD_NETWORK === "mainnet";
+if (MAINNET && !process.argv.includes("--confirm-mainnet")) {
+  console.error("Mainnet deploys spend real MON. Re-run with --confirm-mainnet. No transaction was sent.");
+  process.exit(1);
+}
+const recordPath = join(root, MAINNET ? "src/lib/chain/deployment-mainnet.ts" : "src/lib/chain/deployment.ts");
+const CHAIN_ID = MAINNET ? 143 : 10143;
+const NETWORK_NAME = MAINNET ? "Monad mainnet" : "Monad testnet";
+const EXPORT_NAME = MAINNET ? "mainnetDeployment" : "deployment";
+// Monad charges the gas limit, not gas used. Keep the margin small on mainnet.
+const GAS_MARGIN = MAINNET ? 110n : 120n;
 
 const key = process.env.MONAD_DEPLOYER_PRIVATE_KEY?.trim();
 if (!key) {
@@ -38,7 +49,8 @@ if (!/^0x[a-fA-F0-9]{64}$/.test(key)) {
   process.exit(1);
 }
 
-const rpcUrl = process.env.MONAD_DEPLOY_RPC_URL?.trim() || "https://testnet-rpc.monad.xyz";
+const rpcUrl =
+  process.env.MONAD_DEPLOY_RPC_URL?.trim() || (MAINNET ? "https://rpc.monad.xyz" : "https://testnet-rpc.monad.xyz");
 if (!/^https:\/\//.test(rpcUrl) && !/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(rpcUrl)) {
   console.error("MONAD_DEPLOY_RPC_URL must be https, or http on localhost. No transaction was sent.");
   process.exit(1);
@@ -46,7 +58,7 @@ if (!/^https:\/\//.test(rpcUrl) && !/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.
 
 const chain = defineChain({
   id: CHAIN_ID,
-  name: "Monad Testnet",
+  name: NETWORK_NAME,
   nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
   rpcUrls: { default: { http: [rpcUrl] } },
 });
@@ -83,7 +95,12 @@ const FIELDS = {
 };
 
 function readRecord() {
-  const text = readFileSync(recordPath, "utf8");
+  let text = "";
+  try {
+    text = readFileSync(recordPath, "utf8");
+  } catch {
+    // No record yet for this network.
+  }
   const pick = (field) => {
     const m = text.match(new RegExp(`\\b${field}:\\s*("0x[0-9a-fA-F]+"|\\d+|null)`));
     if (!m || m[1] === "null") return null;
@@ -98,11 +115,11 @@ function writeRecord(r) {
   const addr = (v) => (v ? `"${v}" as \`0x\${string}\`` : "null as `0x${string}` | null");
   const num = (v) => (v == null ? "null as number | null" : `${v} as number | null`);
   const file = `/**
- * Public record of contract deployments on Monad testnet (chain id ${CHAIN_ID}).
+ * Public record of contract deployments on ${NETWORK_NAME} (chain id ${CHAIN_ID}).
  * Written by scripts/deploy-contracts.mjs only after each confirmed Monad transaction.
  * Never invent an address here.
  */
-export const deployment = {
+export const ${EXPORT_NAME} = {
   chainId: ${CHAIN_ID} as const,
   agentRegistry: ${addr(r.agentRegistry)},
   deployBlock: ${num(r.deployBlock)},
@@ -113,7 +130,7 @@ export const deployment = {
   agentProof: ${addr(r.agentProof)},
   proofDeployBlock: ${num(r.proofDeployBlock)},
   proofDeployTx: ${addr(r.proofDeployTx)},
-  /** AgentTrace Demo Protocol. Null until a confirmed testnet deployment exists. */
+  /** AgentTrace Demo Protocol. Null until a confirmed deployment exists. */
   demoProtocol: ${addr(r.demoProtocol)},
   demoProtocolDeployBlock: ${num(r.demoProtocolDeployBlock)},
   demoProtocolDeployTx: ${addr(r.demoProtocolDeployTx)},
@@ -162,7 +179,7 @@ for (const step of todo) {
 }
 const gasPrice = await client.getGasPrice();
 // Monad charges the gas limit, so budget the limit with a 20% margin.
-const needed = ((gasTotal * 12n) / 10n) * gasPrice;
+const needed = ((gasTotal * GAS_MARGIN) / 100n) * gasPrice;
 const balance = await client.getBalance({ address: account.address });
 console.log(`deployer ${account.address}`);
 console.log(`balance ${formatEther(balance)} MON, estimated need ${formatEther(needed)} MON`);
@@ -176,7 +193,7 @@ for (const step of todo) {
   const { abi, bytecode } = artifact(step.name);
   const args = step.args();
   const data = encodeDeployData({ abi, bytecode, args });
-  const gas = ((await client.estimateGas({ account: account.address, data })) * 12n) / 10n;
+  const gas = ((await client.estimateGas({ account: account.address, data })) * GAS_MARGIN) / 100n;
   const hash = await wallet.deployContract({ abi, bytecode, args, account, gas });
   console.log(`${step.name} submitted ${hash}`);
   const receipt = await client.waitForTransactionReceipt({ hash, timeout: 180_000 });
@@ -195,4 +212,4 @@ for (const step of todo) {
   writeRecord(record);
   console.log(`${step.name} deployed ${record[addrField]} block ${record[blockField]}`);
 }
-console.log("deployment.ts updated. Commit it so every build uses these addresses.");
+console.log(`${recordPath.split("/").pop()} updated. Commit it so every build uses these addresses.`);

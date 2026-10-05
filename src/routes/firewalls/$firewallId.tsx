@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MONAD_TESTNET } from "@/lib/chain/network";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { confirmFirewallTx, getChainStatus, getFirewall, verifyProof } from "@/lib/agents/functions";
 import type { FirewallAction, FirewallRecord } from "@/lib/agents/types";
@@ -10,6 +11,7 @@ import { AddressValue, CopyButton, TxValue } from "@/components/values";
 import { addressUrl, formatAgentId, formatDuration, formatWei, proofStatusLabel, statusTone } from "@/lib/format";
 import { toFunctionSelector } from "viem";
 import { toast } from "sonner";
+import { useWalletAccount } from "@/lib/chain/wallet-account";
 
 export const Route = createFileRoute("/firewalls/$firewallId")({ component: FirewallPage });
 
@@ -235,6 +237,7 @@ export function FirewallControls({ firewall, onReload }: { firewall: FirewallRec
   const [txHash, setTxHash] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<null | "pause" | "deactivate" | "execute">(null);
   const [executionId, setExecutionId] = useState<string | null>(null);
+  const wallet = useWalletAccount();
 
   async function run(
     label: string,
@@ -414,6 +417,33 @@ export function FirewallControls({ firewall, onReload }: { firewall: FirewallRec
   }
 
   const disabled = isPending || Boolean(busy);
+  const connected = wallet.address?.toLowerCase() ?? null;
+  // Controls are for the owner (configuration) and the executor (execute). The contract enforces
+  // this anyway; everyone else sees who manages the firewall instead of forms they cannot use.
+  const canManage =
+    Boolean(connected) &&
+    (connected === firewall.owner.toLowerCase() || connected === firewall.executor.toLowerCase());
+  if (!canManage) {
+    return (
+      <section id="edit-permissions" className="mt-10 border-t border-border pt-6">
+        <h2 className="text-sm font-medium">Management</h2>
+        <p className="mt-2 max-w-xl text-sm text-muted">
+          Only the owner can change this firewall, and only the executor can run actions through it. Monad enforces both.
+        </p>
+        <dl className="mt-4 max-w-xl text-sm">
+          <Fact label="Owner">
+            <AddressValue value={firewall.owner} copy explorer />
+          </Fact>
+        </dl>
+        {wallet.ready && wallet.available && !connected ? (
+          <Button type="button" variant="secondary" className="mt-4" onClick={() => void wallet.connect()}>
+            Connect owner wallet
+          </Button>
+        ) : null}
+        {wallet.error ? <p className="mt-2 text-sm text-muted">{wallet.error}</p> : null}
+      </section>
+    );
+  }
 
   return (
     <section id="edit-permissions" className="mt-10 border-t border-border pt-6">
@@ -617,7 +647,7 @@ export function FirewallControls({ firewall, onReload }: { firewall: FirewallRec
           void run("Pause", { functionName: "pauseFirewall", args: [id] });
         }}
       >
-        <p>Network: Monad testnet</p>
+        <p>Network: {MONAD_TESTNET.label}</p>
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm === "deactivate"}
@@ -632,7 +662,7 @@ export function FirewallControls({ firewall, onReload }: { firewall: FirewallRec
           void run("Deactivate", { functionName: "deactivateFirewall", args: [id] });
         }}
       >
-        <p>Network: Monad testnet</p>
+        <p>Network: {MONAD_TESTNET.label}</p>
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm === "execute"}
@@ -646,7 +676,7 @@ export function FirewallControls({ firewall, onReload }: { firewall: FirewallRec
           void executeAction();
         }}
       >
-        <p>Network: Monad testnet</p>
+        <p>Network: {MONAD_TESTNET.label}</p>
         <p className="mt-2">Target {execTarget || "Not set"}</p>
         <p className="mt-1">Value {execValue || "0"} wei</p>
         <p className="mt-2">{policyHint(firewall, execTarget, execData)}</p>

@@ -1,7 +1,7 @@
 import { decodeEventLog, decodeFunctionData, type Log, type TransactionReceipt } from "viem";
 import { getSql, type Sql } from "@/lib/db";
 import { agentFirewallAbi } from "@/lib/chain/abi";
-import { deployment } from "@/lib/chain/deployment";
+import { deployment } from "@/lib/chain/active-deployment";
 import { readAddress } from "@/lib/chain/addresses.server";
 import {
   applyRegistryLog,
