@@ -69,6 +69,7 @@ export type ExecutionRecord = {
   value: string;
   txHash: string;
   proofId: string | null;
+  proofStatus?: string | null;
 };
 
 export type ProofStatus = "executed" | "requested" | "receipt_verified" | "unverifiable" | "temporary_error";

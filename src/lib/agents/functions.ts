@@ -401,6 +401,7 @@ function toExecution(action: {
     value: action.value,
     txHash: action.txHash,
     proofId: action.proofStatus ? action.executionId : null,
+    proofStatus: action.proofStatus,
   };
 }
 
@@ -411,7 +412,7 @@ export const getAgentLayers = createServerFn({ method: "GET" })
     const firewalls = /^[1-9]\d*$/.test(data) ? await listFirewallsByAgent(data) : [];
     let actions = /^[1-9]\d*$/.test(data) ? await listActionsByAgent(data) : [];
     if (actions.some((action) => action.proofStatus !== "receipt_verified")) {
-      await settleProofsFor(actions.slice(0, 12).map((action) => action.executionId));
+      await settleProofsFor(actions.slice(0, 12).map((action) => action.executionId), 1_500);
       actions = await listActionsByAgent(data);
     }
     const proofs = /^[1-9]\d*$/.test(data) ? await listProofsForAgent(data, true) : [];
@@ -512,7 +513,7 @@ export const listProofs = createServerFn({ method: "GET" }).handler(async () => 
   await settlePendingProofs(1);
   let proofs = await listExecutionProofs(100);
   if (proofs.some((proof) => proof.verificationStatus !== "receipt_verified" && proof.verificationStatus !== "unverifiable")) {
-    await settleProofsFor(proofs.slice(0, 12).map((proof) => proof.executionId));
+    await settleProofsFor(proofs.slice(0, 12).map((proof) => proof.executionId), 1_500);
     proofs = await listExecutionProofs(100);
   }
   return {
@@ -596,7 +597,7 @@ export const getFirewall = createServerFn({ method: "GET" })
     }
     let actions = await listFirewallActions(data);
     if (actions.some((action) => action.proofStatus !== "receipt_verified")) {
-      await settleProofsFor(actions.slice(0, 12).map((action) => action.executionId));
+      await settleProofsFor(actions.slice(0, 12).map((action) => action.executionId), 1_500);
       actions = await listFirewallActions(data);
     }
     return { firewall, actions, detail: "" };

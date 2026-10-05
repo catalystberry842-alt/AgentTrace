@@ -1,25 +1,27 @@
 # Demo voiceover
 
-About 2 minutes 30 seconds. Recorded against https://agenttrace-mainnet.vercel.app (Monad mainnet) or https://agenttrace-plum.vercel.app (testnet). Every number below is from a real receipt or from the Monad docs. Do not add others.
+About 2 minutes 30 seconds. Recorded on the live mainnet app, https://agenttrace-mainnet.vercel.app (Monad mainnet, chain 143). The video shows real executions that already happened onchain; it does not stage a wallet session. Every number is from a real receipt, a measured run, or the Monad docs. The narration is generated from this file (`scripts/make-demo-video.mjs`), one scene per section.
 
-**0:00 — Problem.** "AI agents have wallets now. A wallet can call anything. But when an agent acts, nobody can easily answer four questions: which agent was it, what was it allowed to do, what actually ran, and did it work?"
+## 1. Landing
+AI agents have wallets now, and a wallet can call anything. When an agent acts, four questions are hard to answer: which agent was it, what was it allowed to do, what actually ran, and did it work? AgentTrace is an independent validator and audit trail for onchain agents on Monad. It answers each question from the chain, not from the agent's own logs.
 
-**0:15 — What AgentTrace is.** "AgentTrace is an independent validator and audit trail for onchain agents. It answers each question with a separate onchain record, and it never takes the agent's word, or the browser's, for any of them."
+## 2. Agent passport
+This is Research Agent number one, registered on Monad mainnet. Its identity lives in the AgentRegistry contract, owned by this wallet. Below it is its public reputation. The agent is linked to ERC-8004 identity ten thousand two hundred eighty, and AgentTrace has published one validation and one outcome verdict for it, both scored one hundred out of one hundred.
 
-**0:30 — Identity.** Open `/demo`, register the Research Agent. "This is a real transaction to AgentRegistry on Monad. The agent gets a permanent id, owned by this wallet."
+## 3. Firewall
+The firewall is a contract that holds the agent's rules: which executor may act, which contract, which function, and how much value. Here, only deposit on the demo protocol is allowed, and value transfers are off. Anything else is rejected onchain before it reaches the target.
 
-**0:45 — Firewall.** Create the firewall, allow Demo Protocol `deposit`. "The firewall is a contract. It holds the rules: which executor, which contract, which function, how much value. Withdraw is not on the list."
+## 4. Proof
+Here is one execution. AgentTrace's verifier read the transaction and receipt from Monad and checked fourteen things: the agent, the firewall, the executor, the target, the function, the value, the calldata hash, and more. All passed, so the proof hash was anchored onchain in the AgentProof contract. An anchor costs about one hundred seventy-nine thousand gas, roughly zero point zero one eight MON.
 
-**1:00 — Execution.** Run the deposit. "The agent's call goes through AgentFirewall.execute. The firewall checks the rules, makes the call, and only if it succeeds emits an AgentAction event."
+## 5. ERC-8004
+The verdict does not stay inside AgentTrace. The verifier posted it to the shared ERC-8004 Validation Registry, keyed by the proof hash, and posted the outcome to the Reputation Registry. Any wallet, marketplace, or other agent can read it onchain.
 
-**1:10 — Proof.** Open the proof page. "AgentTrace's verifier reads the transaction and receipt from Monad itself and checks fourteen things: agent, firewall, executor, target, selector, value, calldata hash, and more. All pass, so it computes a proof hash and anchors it onchain in AgentProof. That anchor cost 179,045 gas, about 0.018 MON."
+## 6. Outcome
+A successful call is not the same as the result you wanted. The outcome check looks for the Deposited event with the expected agent and amount. It verified, as a separate verdict from the execution proof.
 
-**1:30 — Outcome.** "A call that succeeds is not the same as the result you wanted. The outcome check looks for the Deposited event with amount 100. Verified, as a separate verdict."
+## 7. A third-party agent over MCP
+AgentTrace also works with agents you already run. This is a real session with the AgentTrace MCP server, the way Claude or Cursor would use it. The Treasury Agent, with its own executor key, read its policy, made a deposit that came back verified and anchored in about two seconds, and then tried to withdraw. The firewall refused it in simulation, and nothing was sent.
 
-**1:40 — Blocked action.** Try withdraw. "Withdraw isn't allowed, so the firewall rejects it in simulation. No transaction, no AgentAction, nothing to prove."
-
-**1:50 — ERC-8004.** Scroll to the ERC-8004 panel. "The verdicts don't stay inside AgentTrace. This agent is linked to its ERC-8004 identity, number 10280 on mainnet. AgentTrace posted a validation response of 100 to the ERC-8004 Validation Registry, with the proof hash, and outcome feedback to the Reputation Registry. Any marketplace or agent can read them onchain."
-
-**2:10 — Why Monad.** "Every step here is an onchain write, so cost and speed matter. On Monad, blocks finalize after two blocks, about 600 milliseconds, and anchoring a proof costs about 0.018 MON at the gas price we measured."
-
-**2:20 — Close.** "Any agent can use it with one SDK call: traceCall routes the agent's transaction through the firewall and returns its proof. AgentTrace: every agent leaves a trace."
+## 8. Why Monad
+Every step here is an onchain write, so cost and finality decide whether this is practical. On Monad a proof anchor costs about zero point zero one eight MON, and blocks are final after two blocks, about six hundred milliseconds. Indexing runs on Envio HyperSync. AgentTrace: every agent leaves a trace.

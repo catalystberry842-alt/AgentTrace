@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { TxValue } from "@/components/values";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { getOutcome } from "@/lib/agents/functions";
 import type { OutcomeRecord } from "@/lib/agents/types";
@@ -83,10 +84,10 @@ function OutcomePage() {
           <section className="mt-2">
             <h2 className="type-caption text-faint">Outcome</h2>
             <dl className="mt-2 border-t border-border">
-              <Fact label="Expected result">{outcome.expected || "—"}</Fact>
-              <Fact label="Observed result">{outcome.observed || "—"}</Fact>
+              <Fact label="Expected result">{describeExpected(outcome.expected)}</Fact>
+              <Fact label="Observed result">{describeObserved(outcome.observed)}</Fact>
               <Fact label="Status">{label(outcome.status)}</Fact>
-              <Fact label="Evidence">{outcome.evidence || "—"}</Fact>
+              <Fact label="Evidence">{/^0x[a-fA-F0-9]{64}$/.test(outcome.evidence ?? "") ? <TxValue hash={outcome.evidence} copy /> : outcome.evidence || "—"}</Fact>
             </dl>
           </section>
           {outcome.reason ? <p className="mt-6 max-w-xl text-sm text-muted">{outcome.reason}</p> : null}
@@ -101,4 +102,31 @@ function OutcomePage() {
       ) : null}
     </Shell>
   );
+}
+
+const OPS: Record<string, string> = { "==": "=", "!=": "≠", ">": ">", ">=": "≥", "<": "<", "<=": "≤" };
+
+/** Plain-language form of a stored expectation, e.g. "Deposited emitted with agentId = 1, amount = 100". */
+function describeExpected(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  try {
+    const value = JSON.parse(raw) as { type?: string; event?: string; conditions?: Record<string, { operator?: string; value?: unknown }> };
+    const conditions = Object.entries(value.conditions ?? {})
+      .map(([key, rule]) => `${key} ${OPS[rule.operator ?? "=="] ?? rule.operator} ${String(rule.value)}`)
+      .join(", ");
+    if (value.type === "EVENT_EMITTED" && value.event) return `${value.event} emitted${conditions ? ` with ${conditions}` : ""}`;
+    return conditions || raw;
+  } catch {
+    return raw;
+  }
+}
+
+function describeObserved(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  try {
+    const value = JSON.parse(raw) as Record<string, unknown>;
+    return Object.entries(value).map(([key, v]) => `${key} ${String(v)}`).join(" · ") || raw;
+  } catch {
+    return raw;
+  }
 }

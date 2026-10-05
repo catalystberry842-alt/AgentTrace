@@ -303,9 +303,20 @@ function AgentProfile({ agent }: { agent: IndexedAgent }) {
 
   useEffect(() => {
     let cancelled = false;
+    const settling = (result: { executions: { proofStatus?: string | null }[] }) =>
+      result.executions.some((row) => row.proofStatus && !["receipt_verified", "unverifiable"].includes(row.proofStatus));
     getAgentLayers({ data: agent.agentId })
-      .then((result) => {
-        if (!cancelled) setLayers(result);
+      .then(async (result) => {
+        if (cancelled) return;
+        setLayers(result);
+        // A cold instance may still be re-checking receipts; refresh a couple of times so the
+        // page settles on its own instead of showing "no verified executions".
+        for (let attempt = 0; attempt < 2 && settling(result); attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 2_500));
+          if (cancelled) return;
+          result = await getAgentLayers({ data: agent.agentId });
+          if (!cancelled) setLayers(result);
+        }
       })
       .catch(() => {
         if (!cancelled) {

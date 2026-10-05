@@ -8,7 +8,7 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Shell } from "@/components/shell";
 import { Button, ErrorNote, Fact, Mono, NotFoundState, ProofSkeleton, Status, buttonClass } from "@/components/ui";
 import { AddressValue, CopyButton, TxValue } from "@/components/values";
-import { formatAgentId, formatAgentLabel, formatUtc, formatWei, proofStatusLabel, txUrl } from "@/lib/format";
+import { formatAgentId, formatAgentLabel, formatUtc, formatWei, functionName, proofStatusLabel, txUrl } from "@/lib/format";
 
 export const Route = createFileRoute("/proofs/$proofId")({ component: ProofPage });
 
@@ -157,162 +157,68 @@ function Record({
         <h1 className="type-heading mt-4">
           <Mono>{shortId(proof.executionId)}</Mono>
         </h1>
-        <p className="mt-3 max-w-xl text-sm text-muted">Can this execution be independently verified?</p>
+        <p className="mt-3 max-w-xl text-sm text-pretty text-muted">
+          {proof.verificationStatus === "receipt_verified"
+            ? "AgentTrace re-read this transaction and its receipt from Monad and every check matched. That proves the call ran as recorded; whether it achieved its goal is a separate outcome check."
+            : proof.verificationStatus === "unverifiable"
+              ? "AgentTrace could not match this execution to a consistent receipt, so no proof hash exists."
+              : "AgentTrace has not finished checking the receipt for this execution yet."}
+        </p>
       </header>
+
+      <div className="mt-8 grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-4">
+        <Evidence label="Transaction" ok={proof.checks.some((item) => item.name === "transactionSucceeded" && item.passed)}>
+          {formatUtc(proof.blockTimestamp)}
+        </Evidence>
+        <Evidence label="Receipt checks" ok={proof.verificationStatus === "receipt_verified"}>
+          {proof.checks.length ? `${proof.checks.filter((check) => check.passed).length} of ${proof.checks.length} passed` : "Pending"}
+        </Evidence>
+        <Evidence label="Anchored onchain" ok={proof.anchored}>
+          {proof.anchorTxHash ? <TxValue hash={proof.anchorTxHash} /> : "Not yet"}
+        </Evidence>
+        <Evidence label="Outcome" ok={null}>
+          <Link to="/outcomes/$executionId" params={{ executionId: proof.executionId }} className="hover:underline">
+            View outcome check
+          </Link>
+        </Evidence>
+      </div>
+
       <dl className="mt-8 border-t border-border">
-        <Fact label="Agent">{proof.agentName || formatAgentLabel(proof.agentId)}</Fact>
-        <Fact label="Firewall">{formatAgentId(proof.firewallId)}</Fact>
+        <Fact label="Agent">
+          <Link to="/agents/$agentId" params={{ agentId: proof.agentId }} className="hover:underline">
+            {proof.agentName || "Agent"} <Mono>{formatAgentId(proof.agentId)}</Mono>
+          </Link>
+        </Fact>
+        <Fact label="Firewall">
+          <Link to="/firewalls/$firewallId" params={{ firewallId: proof.firewallId }} className="hover:underline">
+            Firewall <Mono>{formatAgentId(proof.firewallId)}</Mono>
+          </Link>
+        </Fact>
         <Fact label="Executor">
           <AddressValue value={proof.executor} copy explorer />
         </Fact>
-        <Fact label="Target">
-          <AddressValue value={proof.target} copy explorer />
+        <Fact label="Call">
+          <span className="inline-flex flex-wrap items-center gap-x-2">
+            <Mono>{functionName(proof.functionSelector) ?? proof.functionSelector}</Mono>
+            <span className="text-muted">on</span>
+            <AddressValue value={proof.target} copy explorer />
+          </span>
         </Fact>
-        <Fact label="Function">
-          <Mono>{proof.functionSelector}</Mono>
-        </Fact>
+        <Fact label="Value">{formatWei(proof.value)}</Fact>
         <Fact label="Transaction">
-          <TxValue hash={proof.txHash} copy />
-        </Fact>
-      </dl>
-      <p className="mt-4 max-w-xl text-sm text-muted">
-        {proof.verificationStatus === "receipt_verified"
-          ? "Proof: AgentTrace verified that the transaction executed successfully. This is not an outcome."
-          : proof.verificationStatus === "unverifiable"
-            ? "Proof: AgentTrace could not match this execution to a consistent receipt."
-            : "Proof: the receipt has not been verified yet."}
-      </p>
-
-      <dl className="mt-8 border-t border-border">
-        <Fact label="Transaction">{proof.checks.some((item) => item.name === "transactionExists" && item.passed) ? "The transaction exists." : "Not confirmed by a receipt check."}</Fact>
-        <Fact label="Execution">AgentTrace indexed an AgentAction.</Fact>
-        <Fact label="Proof">
-          {proof.verificationStatus === "receipt_verified"
-            ? "The receipt was checked independently."
-            : proof.verificationStatus === "unverifiable"
-              ? "The evidence is inconsistent."
-              : proof.verificationStatus === "temporary_error"
-                ? "The receipt could not be read yet."
-                : "The receipt has not been verified yet."}
-        </Fact>
-        <Fact label="Anchor">{proof.anchored ? "The proof hash is committed onchain." : "Not anchored"}</Fact>
-      </dl>
-
-      <section className="mt-10">
-        <h2 className="text-sm font-medium">Agent</h2>
-        <dl className="mt-3 border-t border-border">
-          <Fact label="Name">{proof.agentName || "—"}</Fact>
-          <Fact label="Agent ID">
-            <span className="inline-flex flex-wrap items-center gap-2">
-              <Link to="/agents/$agentId" params={{ agentId: proof.agentId }} className="hover:underline">
-                <Mono>{formatAgentId(proof.agentId)}</Mono>
-              </Link>
-              <CopyButton value={proof.agentId} label="agent id" />
-            </span>
-          </Fact>
-        </dl>
-      </section>
-
-      <section className="mt-10">
-        <h2 className="text-sm font-medium">Firewall</h2>
-        <dl className="mt-3 border-t border-border">
-          <Fact label="Firewall ID">
-            <span className="inline-flex flex-wrap items-center gap-2">
-              <Link to="/firewalls/$firewallId" params={{ firewallId: proof.firewallId }} className="hover:underline">
-                <Mono>Firewall {formatAgentId(proof.firewallId)}</Mono>
-              </Link>
-              <CopyButton value={proof.firewallId} label="firewall id" />
-            </span>
-          </Fact>
-          <Fact label="Status">{proof.firewallStatus ? proof.firewallStatus : "Not indexed"}</Fact>
-        </dl>
-      </section>
-
-      <section className="mt-10">
-        <h2 className="text-sm font-medium">Executor</h2>
-        <div className="mt-3 border-t border-border">
-          <Fact label="Address">
-            <AddressValue value={proof.executor} copy />
-          </Fact>
-        </div>
-      </section>
-
-      <section className="mt-10">
-        <h2 className="text-sm font-medium">Action</h2>
-        <dl className="mt-3 border-t border-border">
-          <Fact label="Target">
-            <AddressValue value={proof.target} copy />
-          </Fact>
-          <Fact label="Function">Selector recorded on the execution</Fact>
-          <Fact label="Value">{formatWei(proof.value)}</Fact>
-        </dl>
-      </section>
-
-      <section className="mt-10">
-        <h2 className="text-sm font-medium">Transaction</h2>
-        <dl className="mt-3 border-t border-border">
-          <Fact label="Status">{proof.checks.some((item) => item.name === "transactionExists" && item.passed) ? "Confirmed" : "Not confirmed by a receipt check"}</Fact>
-          <Fact label="Hash">
+          <span className="inline-flex flex-wrap items-center gap-x-3">
             <TxValue hash={proof.txHash} copy />
-          </Fact>
-          <Fact label="Timestamp">{formatUtc(proof.blockTimestamp)}</Fact>
-          <Fact label="Explorer">
             {href ? (
-              <a href={href} className="underline-offset-4 hover:underline" rel="noreferrer">
-                View transaction
+              <a href={href} className="text-xs text-muted hover:text-fg" rel="noreferrer">
+                Explorer
               </a>
-            ) : (
-              "No explorer link."
-            )}
-          </Fact>
-        </dl>
-      </section>
-
-      <details className="mt-10 border-t border-border pt-4">
-        <summary className="flex h-11 cursor-pointer items-center text-sm">View details</summary>
-        <dl className="mt-2 border-t border-border">
-          <Fact label="Selector">
-            <span className="inline-flex flex-wrap items-center gap-2">
-              <Mono>{proof.functionSelector}</Mono>
-              <CopyButton value={proof.functionSelector} label="selector" />
-            </span>
-          </Fact>
-          <Fact label="Block">{proof.blockNumber}</Fact>
-          <Fact label="Calldata hash">
-            <span className="inline-flex flex-wrap items-center gap-2">
-              <Mono>{proof.calldataHash}</Mono>
-              <CopyButton value={proof.calldataHash} label="calldata hash" />
-            </span>
-          </Fact>
-          <Fact label="Proof hash">
-            {proof.proofHash ? (
-              <span className="inline-flex flex-wrap items-center gap-2">
-                <Mono>{proof.proofHash}</Mono>
-                <CopyButton value={proof.proofHash} label="proof hash" />
-              </span>
-            ) : (
-              "Not generated"
-            )}
-          </Fact>
-          <Fact label="Method">{proof.verificationMethod ?? "—"}</Fact>
-          <Fact label="Execution ID">
-            <span className="inline-flex flex-wrap items-center gap-2">
-              <Mono>{proof.executionId}</Mono>
-              <CopyButton value={proof.executionId} label="execution id" />
-            </span>
-          </Fact>
-        </dl>
-      </details>
+            ) : null}
+          </span>
+        </Fact>
+      </dl>
 
       <section className="mt-10">
-        <h2 className="text-sm font-medium">Proof</h2>
-        <dl className="mt-3 border-t border-border">
-          <Fact label="Verified">{formatUtc(proof.verifiedAt)}</Fact>
-        </dl>
-      </section>
-
-      <section className="mt-10">
-        <h2 className="text-sm font-medium">Verification</h2>
+        <h2 className="text-sm font-medium">Receipt checks</h2>
         {proof.lastError && proof.verificationStatus === "temporary_error" ? (
           <p className="mt-3 text-sm text-muted">{proof.lastError}</p>
         ) : null}
@@ -321,9 +227,9 @@ function Record({
             {phase === "Verifying execution" ? "Verifying execution" : "Receipt has not been verified yet."}
           </p>
         ) : (
-          <ul className="mt-3 border-t border-border">
+          <ul className="mt-3 grid border-t border-border sm:grid-cols-2 sm:gap-x-8">
             {proof.checks.map((check) => (
-              <li key={check.name} className="flex items-start gap-3 border-b border-border py-3 text-sm">
+              <li key={check.name} className="flex items-start gap-3 border-b border-border py-2.5 text-sm">
                 <span className={check.passed ? "text-ok" : "text-danger"} aria-hidden>
                   {check.passed ? "✓" : "×"}
                 </span>
@@ -375,7 +281,52 @@ function Record({
         {anchorNote ? <p className="mt-3 text-sm text-muted">{anchorNote}</p> : null}
       </section>
       <Erc8004Validation executionId={proof.executionId} txHash={proof.txHash} owner={proof.executor} />
+      <details className="mt-10 border-t border-border pt-2">
+        <summary className="flex h-11 cursor-pointer items-center text-sm text-muted hover:text-fg">Technical details</summary>
+        <dl className="mt-2 border-t border-border">
+          <Fact label="Execution ID">
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <Mono>{proof.executionId}</Mono>
+              <CopyButton value={proof.executionId} label="execution id" />
+            </span>
+          </Fact>
+          <Fact label="Proof hash">
+            {proof.proofHash ? (
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <Mono>{proof.proofHash}</Mono>
+                <CopyButton value={proof.proofHash} label="proof hash" />
+              </span>
+            ) : (
+              "Not generated"
+            )}
+          </Fact>
+          <Fact label="Calldata hash">
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <Mono>{proof.calldataHash}</Mono>
+              <CopyButton value={proof.calldataHash} label="calldata hash" />
+            </span>
+          </Fact>
+          <Fact label="Selector">
+            <Mono>{proof.functionSelector}</Mono>
+          </Fact>
+          <Fact label="Block">{proof.blockNumber}</Fact>
+          <Fact label="Verified at">{formatUtc(proof.verifiedAt)}</Fact>
+          <Fact label="Method">{proof.verificationMethod ?? "—"}</Fact>
+        </dl>
+      </details>
     </article>
+  );
+}
+
+function Evidence({ label, ok, children }: { label: string; ok: boolean | null; children: React.ReactNode }) {
+  return (
+    <div className="bg-bg p-4">
+      <p className="flex items-center gap-2 font-mono text-[11px] tracking-widest text-faint uppercase">
+        {ok === null ? null : <span className={ok ? "text-ok" : "text-faint"} aria-hidden>{ok ? "✓" : "○"}</span>}
+        {label}
+      </p>
+      <div className="mt-2 text-sm text-fg">{children}</div>
+    </div>
   );
 }
 

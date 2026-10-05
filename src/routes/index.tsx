@@ -38,14 +38,15 @@ const SNIPPET = `import { traceCall } from "@agenttrace/sdk";
 
 const r = await traceCall({
   network: "${IS_MAINNET ? "monad-mainnet" : "monad-testnet"}",
-  signer: process.env.AGENT_KEY,   // firewall executor
+  signer: process.env.AGENT_KEY, // executor
   firewallId: 2,
-  target, data,                    // the call your agent makes
+  target, data,  // your agent's call
 });
 
-r.proofStatus   // "receipt_verified", from AgentTrace
-r.anchorTxHash  // proof hash anchored in AgentProof
-// outside the policy → FIREWALL_REJECTED, nothing sent`;
+r.proofStatus  // "receipt_verified"
+r.anchorTxHash // anchored in AgentProof
+// off-policy: FIREWALL_REJECTED,
+// nothing sent`;
 
 function Home() {
   const { user, isPending } = useCurrentUserState();
@@ -206,13 +207,13 @@ function Landing({ pending }: { pending: boolean }) {
         <h2 id="how" className="text-sm font-medium">
           How one agent action is checked
         </h2>
-        <ol className="mt-5 grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-5">
+        <ol className="mt-4 divide-y divide-border border-y border-border">
           {STEPS.map((step, index) => (
-            <li key={step.title} className="bg-bg p-4">
-              <p className="font-mono text-[11px] text-faint">{String(index + 1).padStart(2, "0")}</p>
-              <p className="mt-2 text-sm font-medium">{step.title}</p>
-              <p className="mt-1 text-sm text-pretty text-muted">{step.text}</p>
-              <p className="type-technical mt-3 text-xs text-faint">{step.where}</p>
+            <li key={step.title} className="grid grid-cols-[2.25rem_1fr] gap-x-4 gap-y-1 py-3 text-sm sm:grid-cols-[2.25rem_7rem_1fr_11rem] sm:items-baseline">
+              <span className="font-mono text-xs text-faint">{String(index + 1).padStart(2, "0")}</span>
+              <span className="font-medium">{step.title}</span>
+              <span className="col-start-2 text-muted sm:col-start-auto">{step.text}</span>
+              <span className="type-technical col-start-2 text-xs text-faint sm:col-start-auto sm:text-right">{step.where}</span>
             </li>
           ))}
         </ol>
