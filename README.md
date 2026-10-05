@@ -185,7 +185,7 @@ const r = await traceCall({ network: "monad-testnet", signer: process.env.AGENT_
 // r.executionId, r.txHash, r.proofStatus ("receipt_verified"), r.proofHash, r.proofUrl
 ```
 
-It simulates `AgentFirewall.execute` first, so a call the firewall would block throws `FIREWALL_REJECTED` and sends nothing. Then it sends the transaction, reads `AgentAction` from the receipt, and asks AgentTrace to verify the proof. The verdict comes from AgentTrace's own receipt checks, not from the SDK. Runnable example: [`sdk/examples/trace-call.ts`](sdk/examples/trace-call.ts). See [docs/sdk.md](docs/sdk.md).
+It simulates `AgentFirewall.execute` first, so a call the firewall would block throws `FIREWALL_REJECTED` and sends nothing. Then it sends the transaction, reads `AgentAction` from the receipt, and asks AgentTrace to verify the proof. The verdict comes from AgentTrace's own receipt checks, not from the SDK. Runnable example: [`sdk/examples/trace-call.ts`](sdk/examples/trace-call.ts). A run on testnet on 5 October 2026 (firewall #004, agent #006) sent [`0xfa6772c0…`](https://testnet.monadvision.com/tx/0xfa6772c0ed15a0dc571b3795dcf23a9ba913d7548aae83a77d4dd0043cbceb0b) and returned `proofStatus: "receipt_verified"` for execution [`0x05eb59f6…`](https://agenttrace-plum.vercel.app/proofs/0x05eb59f6cf91d1ce47ece012c044e0df3f8a4205a1c33a962f7089d0c11fa030). See [docs/sdk.md](docs/sdk.md).
 
 ## Integrations considered
 
