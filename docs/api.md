@@ -10,7 +10,7 @@ Errors:
 { "error": { "code": "INVALID_REQUEST", "message": "The request body must be JSON." } }
 ```
 
-Bodies larger than 20,000 characters are rejected. The API does not submit firewall or registry transactions. A confirmed write requires a transaction hash that already exists on Monad testnet. Otherwise `transactionHash` is null.
+Bodies larger than 20,000 characters are rejected. The API does not submit firewall or registry transactions. A confirmed write requires a transaction hash that already exists on the configured Monad network. Otherwise `transactionHash` is null.
 
 ## POST /api/v1/agents
 
@@ -125,6 +125,12 @@ These read the indexer. They do not accept a client-supplied owner or status as 
 - `GET /api/proofs/:executionId`
 - `GET /api/proofs/:executionId/verification`
 - `POST /api/proofs/:executionId/verify`
+- `GET /api/agents/:id/firewall`
+- `GET /api/firewalls` and `GET /api/firewalls/:id/proofs`
+- `GET /api/proofs` (list)
+- `GET /api/reputation?limit=&offset=`: agents with their ERC-8004 verdict history
+- `GET /api/erc8004/agents/:agentId`: ERC-8004 registration file for the agent (used as the `agentURI` when linking)
+- `GET /api/v1/agents` (list)
 - `POST /api/proofs/:executionId/anchor` — signs in with the application session. Anchored is true only after the anchor transaction is confirmed.
 
 ## GET /api/v1/webhooks

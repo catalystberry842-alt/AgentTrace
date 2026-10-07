@@ -26,7 +26,7 @@ The verifier reads the Monad receipt itself. A caller cannot submit a proof obje
 
 A proof is `receipt_verified` only when the transaction exists, the receipt succeeded, the transaction called the configured firewall, and the `AgentAction` log matches the agent, firewall, executor, target, selector, execution id, transaction hash, block, value, and calldata hash.
 
-The proof hash is `keccak256` of the ABI encoding documented in [contracts.md](contracts.md), including chain id 10143. Verification status is not inside the hash. Status is the conclusion. The same evidence must keep the same hash.
+The proof hash is `keccak256` of the ABI encoding documented in [contracts.md](contracts.md), including the chain id (143 on mainnet, 10143 on testnet). Verification status is not inside the hash. Status is the conclusion. The same evidence must keep the same hash.
 
 `temporary_error` means the RPC could not be read yet. It is not `unverifiable` and it is not verified. `anchored` is true only after the anchor transaction is confirmed. A hash that does not match the recomputed evidence is not anchored. If the verifier key or the proof contract is missing, no anchor transaction is sent.
 

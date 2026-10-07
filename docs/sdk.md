@@ -79,4 +79,11 @@ The header value is `sha256=<hex>`.
 
 ## MCP server
 
-`agents/mcp-firewall/server.ts` wraps `traceCall` as a Model Context Protocol server, so any MCP host gets firewall-guarded tools. See the README section "Third-party agent over MCP".
+`agents/mcp-firewall/server.ts` wraps `traceCall` as a Model Context Protocol server (stdio, JSON-RPC 2.0), so any MCP host gets firewall-guarded tools: `agenttrace_policy`, `demo_deposit`, `demo_withdraw`, `call_contract`. Env: `AGENT_KEY` (the firewall executor), `FIREWALL_ID`, `AGENT_ID`, `NETWORK` (`monad-testnet` default, or `monad-mainnet`), optional `AGENTTRACE_URL`.
+
+```bash
+npm run agent:mcp                       # start the server on stdio
+AGENT_KEY=0x... AGENT_ID=2 FIREWALL_ID=2 NETWORK=monad-mainnet npm run agent:session   # scripted session
+```
+
+Recorded mainnet session: [agent-runs/mcp-mainnet.md](agent-runs/mcp-mainnet.md). See the README section "MCP firewall server".

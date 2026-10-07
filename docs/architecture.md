@@ -17,6 +17,33 @@ flowchart TD
     G --> H
 ```
 
+## Lifecycle of one call
+
+```mermaid
+sequenceDiagram
+    participant O as Owner wallet
+    participant X as Executor (agent)
+    participant R as AgentRegistry
+    participant F as AgentFirewall
+    participant T as Target
+    participant I as Indexer
+    participant V as Verifier
+    participant P as AgentProof
+    participant E as ERC-8004
+    O->>R: registerAgent
+    O->>F: createFirewall(executor), allowTarget, allowFunction
+    X->>F: execute(firewallId, target, value, data)
+    F->>R: agent active? owner?
+    F->>T: call
+    F-->>I: AgentAction log
+    I->>V: queue execution
+    V->>V: read tx + receipt, 14 checks, proof hash
+    V->>P: anchorProof
+    O->>E: validationRequest(verifier, erc8004Id, proofURL, proofHash)
+    V->>E: validationResponse(proofHash, 100)
+    V->>E: giveFeedback(erc8004Id, 100 or 0)
+```
+
 ## Agent identity
 
 `AgentRegistry.registerAgent` assigns the next id and emits `AgentRegistered`. The owner address on that event is the blockchain owner. A Google account in AgentTrace is only the application login. It is not written as the agent owner.
@@ -41,7 +68,7 @@ The execution id is `keccak256(abi.encode(firewallId, agentId, executor, nonce, 
 
 ## Events and indexer
 
-The indexer reads logs from the configured registry and firewall addresses on chain 10143. Public Monad RPCs accept at most 100 blocks per `eth_getLogs` call, so the indexer scans in 100-block windows and saves its cursor after each one. A sync call has a short time budget; the next call resumes from the cursor. It stores chain id, contract address, transaction hash, block number, and log index. Reprocessing the same log does not create a second row. If a contract address is unset, the indexer reports that the contract is not deployed and does not invent agents or executions.
+The indexer reads logs from the configured registry and firewall addresses on the configured chain (143 or 10143). Public Monad RPCs accept at most 100 blocks per `eth_getLogs` call, so the indexer scans in 100-block windows and saves its cursor after each one. A sync call has a short time budget; the next call resumes from the cursor. It stores chain id, contract address, transaction hash, block number, and log index. Reprocessing the same log does not create a second row. If a contract address is unset, the indexer reports that the contract is not deployed and does not invent agents or executions.
 
 On serverless hosts each instance starts with an empty in-memory database. When `BLOB_READ_WRITE_TOKEN` is set, the indexer also keeps the raw logs it has applied and the last scanned block in one private Vercel Blob object, keyed by contract address and deploy block. A new instance replays those logs through the same handlers and continues from the cached block. The cache contains only public chain data; deleting it only costs a rescan. Executions replayed this way are queued for receipt verification again, so proof state is recomputed from chain data rather than copied. The same blob keeps outcome requests (execution id and expectation, never the verdict); a fresh instance re-runs those checks against Monad. When a receipt names a firewall or agent the instance has not indexed yet, the instance first scans history up to that block. The proof check falls back to `AgentRegistry.agentExists` when the local index has not seen the agent.
 
@@ -60,6 +87,14 @@ The proof hash is documented in [contracts.md](contracts.md). Anchoring sends th
 ## Outcome verification
 
 Outcome checks are separate from execution proof. `EVENT_EMITTED` reads the target logs. `VALUE_CHANGED`, `BALANCE_CHANGED`, and `STATE_CHANGED` are verified only for Demo Protocol `deposits` or `swapped`, and only when this transaction emitted a matching event and the onchain value equals the expected value. Anything else is rejected or `unverifiable`. It is not marked verified. An expected event on the Demo Protocol is decoded with the real ABI, including indexed parameters such as `agentId`. For other targets the first indexed layout of the given signature that decodes the log is used, and the outcome is verified only when the decoded arguments match the expected ones.
+
+## ERC-8004 publication
+
+Code: `src/lib/chain/erc8004.ts`, `src/lib/chain/erc8004.server.ts`, `src/lib/chain/reputation.server.ts`. A link is accepted only when the ERC-8004 identity has the same owner as the AgentTrace agent and carries the `agenttrace` metadata `abi.encode(chainId, AgentRegistry, agentId)`. The verifier answers a `validationRequest` only for a proof it has receipt-verified and anchored, and posts one `giveFeedback` per execution (execution id in `tag2`). History shown on the passport is read back from the registries (HyperSync topic filters when configured).
+
+## Log sources
+
+`src/lib/chain/hypersync.server.ts` queries Envio HyperSync when `ENVIO_API_TOKEN` is set; `src/lib/chain/log-scan.server.ts` covers the rest with 100-block `eth_getLogs` windows and takes over if HyperSync fails. Both feed the same decoders and handlers in `indexer.server.ts`. Receipts for proofs are always read from Monad RPC. The same code serves chain 143 and 10143; the network is chosen at build time with `VITE_MONAD_NETWORK`.
 
 ## API and SDK
 

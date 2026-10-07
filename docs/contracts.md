@@ -104,7 +104,7 @@ keccak256(abi.encode(
 ))
 ```
 
-`chainId` is 10143 on Monad testnet. Verification status is stored next to this hash, not inside it. Status is the result of the checks. Putting it in the hash would make the same evidence hash differently.
+`chainId` is 143 on Monad mainnet and 10143 on Monad testnet. Verification status is stored next to this hash, not inside it. Status is the result of the checks. Putting it in the hash would make the same evidence hash differently.
 
 `calldataHash` is `keccak256` of the `data` argument passed to `execute`, which is also stored on `AgentAction`.
 

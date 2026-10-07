@@ -10,6 +10,9 @@ An agent id is created in `AgentRegistry`. What that agent may call is stored in
 
 ## What a judge can check
 
+A 5-minute path is in the README: [Judge quick check](../README.md#judge-quick-check).
+
+
 - Live app on Monad mainnet (chain 143): https://agenttrace-mainnet.vercel.app
 - Live app on Monad testnet (chain 10143): https://agenttrace-plum.vercel.app
 - Mainnet example: agent [#001](https://agenttrace-mainnet.vercel.app/agents/1) (ERC-8004 #10280), firewall [#001](https://agenttrace-mainnet.vercel.app/firewalls/1), execution proof [0x52c98d50…](https://agenttrace-mainnet.vercel.app/proofs/0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e) anchored in [`0x2151d023…`](https://monadvision.com/tx/0x2151d023a27cc9f1f1aecda0b8dc74ed44e7e9b5936a7b18c5ca2b1127feff08), ERC-8004 `validationResponse` [`0xd727a688…`](https://monadvision.com/tx/0xd727a688ae93a2078ee9a0e9e39d31bb2c35ed4de8364640a731abd9524d4231) and `giveFeedback` [`0x3c05024a…`](https://monadvision.com/tx/0x3c05024ac5e0f78972734ee68cce1a4bb7126b375d3500a4e6be405f4a81aef6)
@@ -24,6 +27,18 @@ An agent id is created in `AgentRegistry`. What that agent may call is stored in
 - Screenshots: [docs/screenshots](screenshots)
 
 Earlier test runs registered agents #001–#005 and #007–#011 from the same wallet. Onchain history cannot be deleted, so they were deactivated with `AgentRegistry.deactivateAgent`; the agents list hides deactivated agents by default and shows them under All or Inactive.
+
+## Honest limitations
+
+- One AgentTrace verifier wallet anchors proofs and posts ERC-8004 verdicts; no multi-verifier quorum yet.
+- Outcome checks: `EVENT_EMITTED` for any contract; balance/state checks only for Demo Protocol.
+- Live examples target `DemoProtocol` (accounting only). No third-party production protocol integrated yet.
+- Mainnet has two agents: #001 (ERC-8004 #10280) and Treasury Agent #002 (MCP; not ERC-8004 linked).
+- Firewall policy is target + selector + value, not argument values. Not audited.
+
+## Verified build
+
+On 7 October 2026 with Node 22.12.0: `npm test`, `npm run typecheck`, `npm run test:contracts` (with `NODE_OPTIONS=--experimental-strip-types` below Node 22.18), and `npm run build` all pass. The mainnet transactions listed here were re-read from `rpc.monad.xyz` (all `success`), `AgentProof.isAnchored` is true for both mainnet executions, and `getValidationStatus` returns response 100 from the verifier.
 
 ## Deployment
 
