@@ -1,4 +1,4 @@
-import { decodeEventLog, keccak256, parseAbiItem, toBytes, type Hex } from "viem";
+import { decodeEventLog, decodeFunctionData, getAddress, keccak256, parseAbi, parseAbiItem, toBytes, type Hex } from "viem";
 import { getSql } from "@/lib/db";
 import { demoProtocolAbi } from "@/lib/chain/abi";
 import { getPublicClient } from "@/lib/chain/indexer.server";
@@ -6,6 +6,7 @@ import { MONAD_TESTNET } from "@/lib/chain/network";
 import { apiError, apiJson } from "@/lib/developer/errors";
 import { publishDeveloperEvent } from "@/lib/developer/webhooks.server";
 import { configuredDemoProtocol } from "@/lib/chain/addresses.server";
+import { configuredFirewall } from "@/lib/chain/firewall.server";
 import { cachedOutcomeRequests, recordOutcomeRequest } from "@/lib/chain/chain-cache.server";
 
 const SIGNATURE = /^[A-Za-z_][A-Za-z0-9_]*\(([A-Za-z0-9]+)(,[A-Za-z0-9]+)*\)$/;
@@ -530,4 +531,85 @@ export async function replayOutcomeRequests(limit = 6): Promise<void> {
       () => undefined,
     );
   }
+}
+
+/**
+ * Canonical Wrapped MON (WETH9 source, verified on MonadVision Sourcify), from the "Canonical
+ * Contracts" table at docs.monad.xyz/developer-essentials/network-information. Mainnet only.
+ */
+export const WMON_BY_CHAIN: Record<number, `0x${string}`> = {
+  143: "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+};
+
+const WMON_DEPOSIT = "0xd0e30db0";
+const WMON_TRANSFER = "0xa9059cbb";
+const wmonAbi = parseAbi(["function deposit() payable", "function transfer(address dst, uint256 wad) returns (bool)"]);
+const executeAbi = parseAbi(["function execute(uint256 firewallId, address target, uint256 value, bytes data) payable"]);
+
+type ProtocolActionRow = ActionRow & { selector: string; value: string; calldata_hash: string };
+
+/**
+ * Outcome for a call to a known protocol. As with the demo deposit, the expectation is derived
+ * here from the execution itself (target, selector, value, calldata), never supplied by the caller,
+ * so anyone may trigger it and the verdict is the same. Supported today: WMON deposit() and
+ * transfer(address,uint256) on Monad mainnet; the proof is the WMON event in the receipt.
+ */
+export async function verifyProtocolOutcome(executionId: string): Promise<Response> {
+  if (!/^0x[a-fA-F0-9]{64}$/.test(executionId)) {
+    return apiError(400, "INVALID_REQUEST", "Execution id must be a 32-byte hex value.");
+  }
+  const id = executionId.toLowerCase();
+  const sql = await getSql();
+  const actions = await sql<ProtocolActionRow>`
+    select execution_id, agent_id, target, tx_hash, selector, value, calldata_hash from firewall_actions
+    where chain_id = ${MONAD_TESTNET.chainId} and execution_id = ${id}
+  `;
+  const action = actions[0];
+  if (!action) return apiError(404, "EXECUTION_NOT_FOUND", "No indexed execution has that id. Nothing was marked verified.");
+  const wmon = WMON_BY_CHAIN[MONAD_TESTNET.chainId];
+  const firewall = configuredFirewall();
+  if (!wmon || !firewall || action.target.toLowerCase() !== wmon) {
+    return apiError(400, "OUTCOME_UNSUPPORTED", "No built-in outcome adapter for this target. No outcome was recorded.");
+  }
+  const selector = action.selector.toLowerCase();
+  // WMON credits msg.sender, which is the AgentFirewall contract that made the call.
+  const caller = getAddress(firewall);
+  if (selector === WMON_DEPOSIT) {
+    return verifyOutcome(id, {
+      expectation: {
+        type: "EVENT_EMITTED",
+        event: "Deposit",
+        eventSignature: "Deposit(address,uint256)",
+        conditions: { arg0: { operator: "==", value: caller }, arg1: { operator: "==", value: String(BigInt(action.value)) } },
+      },
+    });
+  }
+  if (selector === WMON_TRANSFER) {
+    let dst: string;
+    let wad: bigint;
+    try {
+      const tx = await getPublicClient().getTransaction({ hash: action.tx_hash as Hex });
+      const call = decodeFunctionData({ abi: executeAbi, data: tx.input });
+      const data = call.args[3];
+      if (keccak256(data).toLowerCase() !== action.calldata_hash.toLowerCase()) throw new Error("calldata hash mismatch");
+      const inner = decodeFunctionData({ abi: wmonAbi, data });
+      if (inner.functionName !== "transfer") throw new Error("not transfer");
+      [dst, wad] = [getAddress(inner.args[0]), inner.args[1]];
+    } catch {
+      return apiError(409, "OUTCOME_UNSUPPORTED", "The transfer calldata could not be read from the transaction. No outcome was recorded.");
+    }
+    return verifyOutcome(id, {
+      expectation: {
+        type: "EVENT_EMITTED",
+        event: "Transfer",
+        eventSignature: "Transfer(address,address,uint256)",
+        conditions: {
+          arg0: { operator: "==", value: caller },
+          arg1: { operator: "==", value: dst },
+          arg2: { operator: "==", value: wad.toString() },
+        },
+      },
+    });
+  }
+  return apiError(400, "OUTCOME_UNSUPPORTED", "No built-in outcome adapter for this WMON function. No outcome was recorded.");
 }

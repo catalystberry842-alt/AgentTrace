@@ -1,0 +1,51 @@
+{
+  "chainId": 143,
+  "owner": "0xB925D44d52815D19C2f91c30f6aBD3B4D0546D4E",
+  "executor": "0xB925D44d52815D19C2f91c30f6aBD3B4D0546D4E",
+  "wmon": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+  "txs": {
+    "registerAgent": "0x6a97819acda634dd4f31d613c046d405fe76ee492eb831d71befaaecbaa2643f",
+    "createFirewall": "0xac4ff00d5286403495d4d060baa16cadfd9241658950ac7b89502d4fd66fe543",
+    "allowTarget": "0xbf672072aa822759be36f84d04b3f8d53042a31e238299a315c32fa02cb52085",
+    "allowFunctionDeposit": "0x39c967d3d1537bc5f102ccd5d07f68752ac3b185b8059b3bd6668a547ddcc9f7",
+    "allowFunctionTransfer": "0xa341bb296b5abba4a90d1567b5da3dddc72dda2f91d29d1d37eded5d9df2d804"
+  },
+  "agentId": "3",
+  "firewallId": "3",
+  "sessions": {
+    "deposit": {
+      "allowed": true,
+      "txHash": "0x17ec0160c8929c55a53165e833a8ebb7afb6cfe8a3547b13c8bd962df46a37d3",
+      "executionId": "0x30985cb60afd8d37b5edfad48312f32ecffa3e34366d31b7f9ec94ef574a9552",
+      "proofStatus": "receipt_verified",
+      "proofHash": "0xcf38cf595af03f65fd47e50b2819eb49e2780c106ab8c5837a419743cf21c2de",
+      "anchorTxHash": "0x107ad29fa0c1fe51c2c22f6a6a7d85ec5479324fc970a137a2f48e67f0115fd3"
+    },
+    "mcpTransfer": {
+      "allowed": true,
+      "txHash": "0x9ad6de14a8c4c19944b28dc0d676a20460a167cef5883dd3824f9cc1b26b99b1",
+      "executionId": "0x55b2e18ff7e0995159672f4624451510079632662086fa3a65d3896ecced1862",
+      "proofStatus": "receipt_verified",
+      "proofHash": "0xb3c5b46542dbf249562e406bab7b3560e7581995ff1df3ee1a5f1e6bdbbe3f89",
+      "anchorTxHash": "0x5a8cdaf9f1a27644e8891d5dc4fe39420697cbdda7875510db8c40f180ca0764"
+    },
+    "mcpWithdraw": {
+      "allowed": false,
+      "code": "FIREWALL_REJECTED",
+      "message": "The firewall would reject this call. Nothing was sent. AgentFirewall reverted with FunctionNotAllowed(3, 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A, 0x2e1a7d4d).",
+      "sent": false
+    },
+    "mcpOvercap": {
+      "allowed": false,
+      "code": "POLICY_REJECTED",
+      "message": "Argument 1 of 0xa9059cbb is 1000000000000000000, above the maxAmount 10000000000000000. Nothing was sent.",
+      "sent": false
+    },
+    "valueCap": {
+      "allowed": false,
+      "code": "FIREWALL_REJECTED",
+      "message": "The firewall would reject this call. Nothing was sent. AgentFirewall reverted with TransactionValueTooHigh(3, 30000000000000000).",
+      "sent": false
+    }
+  }
+}

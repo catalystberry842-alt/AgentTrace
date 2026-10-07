@@ -61,6 +61,7 @@ import { Route as ApiFirewallsFirewallIdTargetsRouteImport } from './routes/api/
 import { Route as ApiOutcomesExecutionIdIndexRouteImport } from './routes/api/outcomes/$executionId/index'
 import { Route as ApiOutcomesExecutionIdAnchorRouteImport } from './routes/api/outcomes/$executionId/anchor'
 import { Route as ApiOutcomesExecutionIdEvidenceRouteImport } from './routes/api/outcomes/$executionId/evidence'
+import { Route as ApiOutcomesExecutionIdProtocolRouteImport } from './routes/api/outcomes/$executionId/protocol'
 import { Route as ApiOutcomesExecutionIdVerifyRouteImport } from './routes/api/outcomes/$executionId/verify'
 import { Route as ApiProofsExecutionIdIndexRouteImport } from './routes/api/proofs/$executionId/index'
 import { Route as ApiProofsExecutionIdAnchorRouteImport } from './routes/api/proofs/$executionId/anchor'
@@ -355,6 +356,12 @@ const ApiOutcomesExecutionIdEvidenceRoute =
     path: '/api/outcomes/$executionId/evidence',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiOutcomesExecutionIdProtocolRoute =
+  ApiOutcomesExecutionIdProtocolRouteImport.update({
+    id: '/api/outcomes/$executionId/protocol',
+    path: '/api/outcomes/$executionId/protocol',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOutcomesExecutionIdVerifyRoute =
   ApiOutcomesExecutionIdVerifyRouteImport.update({
     id: '/api/outcomes/$executionId/verify',
@@ -521,6 +528,7 @@ export interface FileRoutesByFullPath {
   '/api/firewalls/$firewallId/targets': typeof ApiFirewallsFirewallIdTargetsRoute
   '/api/outcomes/$executionId/anchor': typeof ApiOutcomesExecutionIdAnchorRoute
   '/api/outcomes/$executionId/evidence': typeof ApiOutcomesExecutionIdEvidenceRoute
+  '/api/outcomes/$executionId/protocol': typeof ApiOutcomesExecutionIdProtocolRoute
   '/api/outcomes/$executionId/verify': typeof ApiOutcomesExecutionIdVerifyRoute
   '/api/proofs/$executionId/anchor': typeof ApiProofsExecutionIdAnchorRoute
   '/api/proofs/$executionId/verification': typeof ApiProofsExecutionIdVerificationRoute
@@ -595,6 +603,7 @@ export interface FileRoutesByTo {
   '/api/firewalls/$firewallId/targets': typeof ApiFirewallsFirewallIdTargetsRoute
   '/api/outcomes/$executionId/anchor': typeof ApiOutcomesExecutionIdAnchorRoute
   '/api/outcomes/$executionId/evidence': typeof ApiOutcomesExecutionIdEvidenceRoute
+  '/api/outcomes/$executionId/protocol': typeof ApiOutcomesExecutionIdProtocolRoute
   '/api/outcomes/$executionId/verify': typeof ApiOutcomesExecutionIdVerifyRoute
   '/api/proofs/$executionId/anchor': typeof ApiProofsExecutionIdAnchorRoute
   '/api/proofs/$executionId/verification': typeof ApiProofsExecutionIdVerificationRoute
@@ -670,6 +679,7 @@ export interface FileRoutesById {
   '/api/firewalls/$firewallId/targets': typeof ApiFirewallsFirewallIdTargetsRoute
   '/api/outcomes/$executionId/anchor': typeof ApiOutcomesExecutionIdAnchorRoute
   '/api/outcomes/$executionId/evidence': typeof ApiOutcomesExecutionIdEvidenceRoute
+  '/api/outcomes/$executionId/protocol': typeof ApiOutcomesExecutionIdProtocolRoute
   '/api/outcomes/$executionId/verify': typeof ApiOutcomesExecutionIdVerifyRoute
   '/api/proofs/$executionId/anchor': typeof ApiProofsExecutionIdAnchorRoute
   '/api/proofs/$executionId/verification': typeof ApiProofsExecutionIdVerificationRoute
@@ -746,6 +756,7 @@ export interface FileRouteTypes {
     | '/api/firewalls/$firewallId/targets'
     | '/api/outcomes/$executionId/anchor'
     | '/api/outcomes/$executionId/evidence'
+    | '/api/outcomes/$executionId/protocol'
     | '/api/outcomes/$executionId/verify'
     | '/api/proofs/$executionId/anchor'
     | '/api/proofs/$executionId/verification'
@@ -820,6 +831,7 @@ export interface FileRouteTypes {
     | '/api/firewalls/$firewallId/targets'
     | '/api/outcomes/$executionId/anchor'
     | '/api/outcomes/$executionId/evidence'
+    | '/api/outcomes/$executionId/protocol'
     | '/api/outcomes/$executionId/verify'
     | '/api/proofs/$executionId/anchor'
     | '/api/proofs/$executionId/verification'
@@ -894,6 +906,7 @@ export interface FileRouteTypes {
     | '/api/firewalls/$firewallId/targets'
     | '/api/outcomes/$executionId/anchor'
     | '/api/outcomes/$executionId/evidence'
+    | '/api/outcomes/$executionId/protocol'
     | '/api/outcomes/$executionId/verify'
     | '/api/proofs/$executionId/anchor'
     | '/api/proofs/$executionId/verification'
@@ -968,6 +981,7 @@ export interface RootRouteChildren {
   ApiFirewallsFirewallIdTargetsRoute: typeof ApiFirewallsFirewallIdTargetsRoute
   ApiOutcomesExecutionIdAnchorRoute: typeof ApiOutcomesExecutionIdAnchorRoute
   ApiOutcomesExecutionIdEvidenceRoute: typeof ApiOutcomesExecutionIdEvidenceRoute
+  ApiOutcomesExecutionIdProtocolRoute: typeof ApiOutcomesExecutionIdProtocolRoute
   ApiOutcomesExecutionIdVerifyRoute: typeof ApiOutcomesExecutionIdVerifyRoute
   ApiProofsExecutionIdAnchorRoute: typeof ApiProofsExecutionIdAnchorRoute
   ApiProofsExecutionIdVerificationRoute: typeof ApiProofsExecutionIdVerificationRoute
@@ -1359,6 +1373,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOutcomesExecutionIdEvidenceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/outcomes/$executionId/protocol': {
+      id: '/api/outcomes/$executionId/protocol'
+      path: '/api/outcomes/$executionId/protocol'
+      fullPath: '/api/outcomes/$executionId/protocol'
+      preLoaderRoute: typeof ApiOutcomesExecutionIdProtocolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/outcomes/$executionId/verify': {
       id: '/api/outcomes/$executionId/verify'
       path: '/api/outcomes/$executionId/verify'
@@ -1563,6 +1584,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFirewallsFirewallIdTargetsRoute: ApiFirewallsFirewallIdTargetsRoute,
   ApiOutcomesExecutionIdAnchorRoute: ApiOutcomesExecutionIdAnchorRoute,
   ApiOutcomesExecutionIdEvidenceRoute: ApiOutcomesExecutionIdEvidenceRoute,
+  ApiOutcomesExecutionIdProtocolRoute: ApiOutcomesExecutionIdProtocolRoute,
   ApiOutcomesExecutionIdVerifyRoute: ApiOutcomesExecutionIdVerifyRoute,
   ApiProofsExecutionIdAnchorRoute: ApiProofsExecutionIdAnchorRoute,
   ApiProofsExecutionIdVerificationRoute: ApiProofsExecutionIdVerificationRoute,
