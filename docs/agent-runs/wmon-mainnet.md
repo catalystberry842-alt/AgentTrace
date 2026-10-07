@@ -114,3 +114,25 @@ Transfer 1 WMON: above the 0.01 off-chain cap, so the MCP server refuses it befo
 }
 ```
 
+
+## After the sessions
+
+**Outcomes** (built-in WMON adapter, `POST /api/outcomes/:executionId/protocol`; the expectation is derived by the server from the execution, not supplied by the caller):
+
+| Execution | Expected event on WMON | Observed | Status |
+| --- | --- | --- | --- |
+| [0x30985cb6…](https://agenttrace-mainnet.vercel.app/outcomes/0x30985cb60afd8d37b5edfad48312f32ecffa3e34366d31b7f9ec94ef574a9552) deposit | `Deposit(dst = AgentFirewall, wad = 0.01 MON)` | `0x6941…b441`, `10000000000000000` | verified |
+| [0x55b2e18f…](https://agenttrace-mainnet.vercel.app/outcomes/0x55b2e18ff7e0995159672f4624451510079632662086fa3a65d3896ecced1862) transfer | `Transfer(src = AgentFirewall, dst = owner, wad = 0.01 WMON)` | `0x6941…b441`, `0xB925…6D4E`, `10000000000000000` | verified |
+
+**ERC-8004** (official mainnet registries): identity #10315 registered by the owner in [`0xd103b471…`](https://monadvision.com/tx/0xd103b471416bc968fd4c84acb3ce67387c50e4607f03c321e6e0c7bca125fc4c) (agent URI `https://agenttrace-mainnet.vercel.app/api/erc8004/agents/3`).
+
+| Execution | `validationRequest` (owner) | `validationResponse` 100 (verifier) | `giveFeedback` 100 (verifier, after the verified outcome) |
+| --- | --- | --- | --- |
+| deposit | [`0x98af1ab7…`](https://monadvision.com/tx/0x98af1ab7d618416e9b0ed8a463c721336003a780d77df1410b4d0dca7d6e90bd) | [`0xec0b469a…`](https://monadvision.com/tx/0xec0b469afbd31f15f2ed22d29e931a3fa95a9774ec5c33a5b8e62434b4c57e2c) | [`0x8d0e94ff…`](https://monadvision.com/tx/0x8d0e94ff2bc34017d01b504166c5e83a0c92cb097f3db0aba9288e137930dd11) |
+| transfer | [`0x31db53e3…`](https://monadvision.com/tx/0x31db53e3218b912c363573fcec5fc56489008dd9bb95827d2e74d6d53761a806) | [`0x12d9990d…`](https://monadvision.com/tx/0x12d9990d6d9bd875da8eee6711c1bb2ddb9e4b88c753e15a65da28e63bfe0788) | [`0xfc8a59aa…`](https://monadvision.com/tx/0xfc8a59aad7cc3bdee5ddf40aea67bb20d38fb81242ac84cc985d1ee512c74210) |
+
+**Independent check**: `node scripts/verify-proof.mjs <hash>` prints `PASS` for both executions, by execution id, execution tx, and anchor tx.
+
+**Afterwards**, outside the firewall, the owner unwrapped the returned 0.01 WMON with `WMON.withdraw` in [`0x6af4688f…`](https://monadvision.com/tx/0x6af4688fa7edaa4bc6fe2a0da24e5217503142b340d457a6a9b188f7456199e3).
+
+Reproduce: `AGENT_KEY=0x… node agents/wmon-agent/setup.mjs --confirm-mainnet`, then `AGENT_KEY=0x… npx tsx agents/wmon-agent/run-sessions.ts --confirm-mainnet`. Record: [wmon-mainnet.json](wmon-mainnet.json).

@@ -102,6 +102,8 @@ Only `EVENT_EMITTED` is accepted for arbitrary contracts. The signature must mat
 
 Demo Protocol also accepts `VALUE_CHANGED`, `BALANCE_CHANGED`, and `STATE_CHANGED` when `source` is `DemoProtocol`, `field` is `deposits` or `swapped`, and `expectedValue` is the decimal value to compare with the contract. The verifier reads the receipt and `deposits` or `swapped`. It is verified only when this transaction emitted a Demo Protocol event for that agent and the current value equals `expectedValue`. Any other source is `OUTCOME_UNSUPPORTED` and is not stored as verified. A missing Demo Protocol deployment does not invent a balance.
 
+`POST /api/outcomes/:executionId/protocol` (no key; optional body `{ "transactionHash": "0x…" }` as an indexing hint) runs a built-in outcome check for a known protocol. Today that is canonical WMON on Monad mainnet: `deposit()` expects `Deposit(AgentFirewall, value)` and `transfer(dst, wad)` expects `Transfer(AgentFirewall, dst, wad)`. The server derives the expectation from the indexed execution and its calldata, so the caller cannot change the verdict. Other targets return `400 OUTCOME_UNSUPPORTED`.
+
 The same outcome routes exist at `/api/outcomes/:executionId`, `/evidence`, `/verify`, and `/anchor`. `POST /anchor` does not send a transaction. Outcomes are not anchored onchain. Proof anchoring stays on `POST /api/proofs/:executionId/anchor`.
 
 ## Public indexed reads

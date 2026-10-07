@@ -24,6 +24,7 @@ An agent holding a wallet can call anything, and afterwards nobody can easily sa
 - [ERC-8004 integration](#erc-8004-integration)
 - [SDK: `traceCall`](#sdk-tracecall)
 - [MCP firewall server](#mcp-firewall-server-mainnet)
+- [Real protocol on mainnet: WMON Agent #003](#real-protocol-on-mainnet-wmon-agent-003)
 - [Amount limits](#amount-limits-argument-caps)
 - [Recompute a proof yourself](#recompute-a-proof-yourself)
 - [HTTP API](#http-api)
@@ -249,6 +250,27 @@ A scripted session ([`run-session.ts`](agents/mcp-firewall/run-session.ts), tran
 AGENT_KEY=0x... AGENT_ID=2 FIREWALL_ID=2 NETWORK=monad-mainnet npm run agent:session
 ```
 
+## Real protocol on mainnet: WMON Agent #003
+
+Agent [#003](https://agenttrace-mainnet.vercel.app/agents/3) calls a live Monad protocol, canonical **Wrapped MON** [`0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A`](https://monadvision.com/address/0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A) (listed under "Canonical Contracts" in the [Monad mainnet network information](https://docs.monad.xyz/developer-essentials/network-information); WETH9 source, full match on MonadVision Sourcify). Its owner wallet `0xB925…6D4E` is also its executor. Firewall [#003](https://agenttrace-mainnet.vercel.app/firewalls/3): target WMON only, `deposit()` and `transfer(address,uint256)` only, value transfers on with at most 0.02 MON per call and 0.05 MON per day. ERC-8004 identity **#10315**.
+
+| Step | Transaction |
+| --- | --- |
+| Register agent #003 / create firewall #003 | [`0x6a97819a…`](https://monadvision.com/tx/0x6a97819acda634dd4f31d613c046d405fe76ee492eb831d71befaaecbaa2643f) / [`0xac4ff00d…`](https://monadvision.com/tx/0xac4ff00d5286403495d4d060baa16cadfd9241658950ac7b89502d4fd66fe543) |
+| Allow WMON / `deposit()` / `transfer` | [`0xbf672072…`](https://monadvision.com/tx/0xbf672072aa822759be36f84d04b3f8d53042a31e238299a315c32fa02cb52085) / [`0x39c967d3…`](https://monadvision.com/tx/0x39c967d3d1537bc5f102ccd5d07f68752ac3b185b8059b3bd6668a547ddcc9f7) / [`0xa341bb29…`](https://monadvision.com/tx/0xa341bb296b5abba4a90d1567b5da3dddc72dda2f91d29d1d37eded5d9df2d804) |
+| Session 1 (SDK `traceCall`): wrap 0.01 MON, `WMON.deposit()` through the firewall | [`0x17ec0160…`](https://monadvision.com/tx/0x17ec0160c8929c55a53165e833a8ebb7afb6cfe8a3547b13c8bd962df46a37d3), [proof](https://agenttrace-mainnet.vercel.app/proofs/0x30985cb60afd8d37b5edfad48312f32ecffa3e34366d31b7f9ec94ef574a9552) `receipt_verified`, anchored [`0x107ad29f…`](https://monadvision.com/tx/0x107ad29fa0c1fe51c2c22f6a6a7d85ec5479324fc970a137a2f48e67f0115fd3), [outcome](https://agenttrace-mainnet.vercel.app/outcomes/0x30985cb60afd8d37b5edfad48312f32ecffa3e34366d31b7f9ec94ef574a9552) `Deposit(AgentFirewall, 0.01)` verified |
+| Session 2 (MCP): return the 0.01 WMON to the owner, `WMON.transfer` | [`0x9ad6de14…`](https://monadvision.com/tx/0x9ad6de14a8c4c19944b28dc0d676a20460a167cef5883dd3824f9cc1b26b99b1), [proof](https://agenttrace-mainnet.vercel.app/proofs/0x55b2e18ff7e0995159672f4624451510079632662086fa3a65d3896ecced1862) `receipt_verified`, anchored [`0x5a8cdaf9…`](https://monadvision.com/tx/0x5a8cdaf9f1a27644e8891d5dc4fe39420697cbdda7875510db8c40f180ca0764), [outcome](https://agenttrace-mainnet.vercel.app/outcomes/0x55b2e18ff7e0995159672f4624451510079632662086fa3a65d3896ecced1862) `Transfer(AgentFirewall, owner, 0.01)` verified |
+| Session 2 (MCP): `WMON.withdraw` | rejected, `FunctionNotAllowed(3, WMON, 0x2e1a7d4d)`; nothing sent |
+| Session 2 (MCP): `transfer` of 1 WMON | rejected off-chain, `POLICY_REJECTED` (cap 0.01 WMON); nothing sent |
+| Session 3 (SDK): `deposit()` with 0.03 MON | rejected, `TransactionValueTooHigh(3, 0.03 MON)`; nothing sent |
+| ERC-8004 identity #10315 (`register`, owner) | [`0xd103b471…`](https://monadvision.com/tx/0xd103b471416bc968fd4c84acb3ce67387c50e4607f03c321e6e0c7bca125fc4c) |
+| Deposit: `validationRequest` / `validationResponse` 100 / `giveFeedback` 100 | [`0x98af1ab7…`](https://monadvision.com/tx/0x98af1ab7d618416e9b0ed8a463c721336003a780d77df1410b4d0dca7d6e90bd) / [`0xec0b469a…`](https://monadvision.com/tx/0xec0b469afbd31f15f2ed22d29e931a3fa95a9774ec5c33a5b8e62434b4c57e2c) / [`0x8d0e94ff…`](https://monadvision.com/tx/0x8d0e94ff2bc34017d01b504166c5e83a0c92cb097f3db0aba9288e137930dd11) |
+| Transfer: `validationRequest` / `validationResponse` 100 / `giveFeedback` 100 | [`0x31db53e3…`](https://monadvision.com/tx/0x31db53e3218b912c363573fcec5fc56489008dd9bb95827d2e74d6d53761a806) / [`0x12d9990d…`](https://monadvision.com/tx/0x12d9990d6d9bd875da8eee6711c1bb2ddb9e4b88c753e15a65da28e63bfe0788) / [`0xfc8a59aa…`](https://monadvision.com/tx/0xfc8a59aad7cc3bdee5ddf40aea67bb20d38fb81242ac84cc985d1ee512c74210) |
+
+The outcomes come from a built-in WMON adapter (`POST /api/outcomes/:executionId/protocol`). The server derives the expected event from the execution (target, selector, value, calldata), so no API key is needed and the caller cannot pick the verdict. Reputation feedback was posted only after the outcome verified. Both proofs pass `scripts/verify-proof.mjs`. Full transcript: [docs/agent-runs/wmon-mainnet.md](docs/agent-runs/wmon-mainnet.md). Scripts: [`agents/wmon-agent/`](agents/wmon-agent).
+
+Custody note: WMON credits `msg.sender`, which is the shared `AgentFirewall` contract, not a per-agent account, so session 2 returned the WMON right away. Prefer calls that pay out to an explicit recipient. See [Limitations](#limitations).
+
 ## Amount limits (argument caps)
 
 Where each limit is enforced, stated exactly:
@@ -282,6 +304,7 @@ Reproduce: `MONAD_DEPLOYER_PRIVATE_KEY=0x… node scripts/argcap-testnet.mjs` (t
 ```bash
 node scripts/verify-proof.mjs 0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e             # mainnet agent #001
 node scripts/verify-proof.mjs 0x6d3fda85231be2a7f58798157f7e07dc67167b16cd69061825023ea95bb4bfc1             # mainnet #002 anchor tx
+node scripts/verify-proof.mjs 0x17ec0160c8929c55a53165e833a8ebb7afb6cfe8a3547b13c8bd962df46a37d3             # mainnet #003 WMON deposit tx
 node scripts/verify-proof.mjs 0x577824ab9bef8a84f9b2b0063d8bd580986e456d10a7837861483f9bc26737c4 --chain testnet
 ```
 
@@ -299,6 +322,7 @@ Routes live in [`src/routes/api`](src/routes/api). Highlights:
 | `GET /api/agents`, `/api/agents/:id`, `/events`, `/activity`, `/proofs`, `/outcomes`, `/reputation`, `/firewall` | Indexed agent data |
 | `GET /api/firewalls/:id`, `/policy`, `/targets`, `/functions`, `/executions`, `/proofs` | Indexed firewall data |
 | `POST /api/outcomes/:executionId/verify`, `GET /evidence` | Outcome verification |
+| `POST /api/outcomes/:executionId/protocol` | Built-in outcome check for a known protocol (WMON on mainnet); the expectation is derived from the execution, no key |
 | `GET /api/erc8004/agents/:agentId` | ERC-8004 registration file for a linked agent |
 | `GET /api/reputation` | Agents with their ERC-8004 verdict history (paged: `limit`, `offset`) |
 | `/api/v1/...` | Bearer-key developer API (agents, firewalls, executions, proofs, outcomes, webhooks) |
@@ -334,8 +358,9 @@ Stated plainly:
 
 - **Single verifier.** One AgentTrace-run wallet anchors proofs and posts ERC-8004 verdicts. There is no multi-verifier quorum, staking, or slashing yet.
 - **Outcome checks are narrow.** Arbitrary contracts support `EVENT_EMITTED` only. Balance/value/state checks work only for the bundled Demo Protocol. Anything else is `unverifiable`.
-- **Demo target.** The live examples use `DemoProtocol`, an accounting-only contract with no custody. No third-party production protocol is integrated yet.
-- **Small live footprint.** Two active agents on mainnet: #001 (linked to ERC-8004 #10280) and Treasury Agent #002 (MCP; not ERC-8004 linked). On testnet, earlier test agents were deactivated; agent #006 is the showcase, and agent #012 ("ArgCap Agent") uses an `AgentFirewallV2` firewall that the app does not index yet.
+- **One real protocol so far.** Agent #003 calls canonical WMON on mainnet. The other live examples use `DemoProtocol`, an accounting-only contract with no custody. Built-in outcome adapters exist only for WMON `deposit`/`transfer` and the Demo Protocol.
+- **Shared custody in the firewall.** Calls run with `msg.sender` = the single `AgentFirewall` contract, so tokens a protocol sends to the caller sit in that shared contract, and any firewall that allows `transfer` on that token could move them. Use protocols that pay an explicit recipient, or return the tokens in the next call, as agent #003 does. A per-agent vault is on the roadmap.
+- **Small live footprint.** Three active agents on mainnet: #001 (ERC-8004 #10280), Treasury Agent #002 (MCP; not ERC-8004 linked), and WMON Agent #003 (ERC-8004 #10315; owner and executor are the same wallet). On testnet, earlier test agents were deactivated; agent #006 is the showcase, and agent #012 ("ArgCap Agent") uses an `AgentFirewallV2` firewall that the app does not index yet.
 - **No server-side executor.** The API evaluates policy but does not send firewall transactions; the agent (or SDK) signs.
 - **Hosted apps run wallet-only.** API keys and webhooks need an account database, which the hosted deployments do not run; the developer API client is testnet/self-hosted only.
 - **SDK not on npm yet.** `sdk/` is packaged as `agenttrace-monad` (`cd sdk && npm pack` builds `dist/` and a tarball) but has not been published.
@@ -453,14 +478,15 @@ docs/                  architecture, contracts, api, sdk, security, submission, 
 
 Everything below is public; no wallet needed.
 
-1. Open agent [#001 on mainnet](https://agenttrace-mainnet.vercel.app/agents/1): owner, firewall, linked ERC-8004 #10280, reputation history.
-2. Open its [execution proof](https://agenttrace-mainnet.vercel.app/proofs/0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e): 14 receipt checks, proof hash, anchor tx [`0x2151d023…`](https://monadvision.com/tx/0x2151d023a27cc9f1f1aecda0b8dc74ed44e7e9b5936a7b18c5ca2b1127feff08).
-3. Check ERC-8004 on the explorer: [`validationResponse`](https://monadvision.com/tx/0xd727a688ae93a2078ee9a0e9e39d31bb2c35ed4de8364640a731abd9524d4231) and [`giveFeedback`](https://monadvision.com/tx/0x3c05024ac5e0f78972734ee68cce1a4bb7126b375d3500a4e6be405f4a81aef6), both from the verifier.
-4. Read the [MCP transcript](docs/agent-runs/mcp-mainnet.md): an allowed deposit with a verified, anchored proof and a blocked withdraw with nothing sent.
-5. Open [firewall #001](https://agenttrace-mainnet.vercel.app/firewalls/1): readable policy and execution history.
-6. Optional: `npm ci && node scripts/verify-proof.mjs 0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e` to recompute that proof hash from public RPC and compare it with the onchain anchor (prints `PASS`).
-7. Optional: `npm run test:contracts` to see the firewall rules, including V2 argument caps, enforced in a local EVM.
-8. Optional, with a wallet and a little testnet MON: run `/demo` on [testnet](https://agenttrace-plum.vercel.app/demo) end to end.
+1. Open agent [#003 on mainnet](https://agenttrace-mainnet.vercel.app/agents/3): a real WMON wrap through its firewall, [proof](https://agenttrace-mainnet.vercel.app/proofs/0x30985cb60afd8d37b5edfad48312f32ecffa3e34366d31b7f9ec94ef574a9552) anchored onchain, [outcome](https://agenttrace-mainnet.vercel.app/outcomes/0x30985cb60afd8d37b5edfad48312f32ecffa3e34366d31b7f9ec94ef574a9552) from the WMON `Deposit` event, ERC-8004 #10315 with two validations and two feedback entries at 100.
+2. Open agent [#001 on mainnet](https://agenttrace-mainnet.vercel.app/agents/1): owner, firewall, linked ERC-8004 #10280, reputation history.
+3. Open its [execution proof](https://agenttrace-mainnet.vercel.app/proofs/0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e): 14 receipt checks, proof hash, anchor tx [`0x2151d023…`](https://monadvision.com/tx/0x2151d023a27cc9f1f1aecda0b8dc74ed44e7e9b5936a7b18c5ca2b1127feff08).
+4. Check ERC-8004 on the explorer: [`validationResponse`](https://monadvision.com/tx/0xd727a688ae93a2078ee9a0e9e39d31bb2c35ed4de8364640a731abd9524d4231) and [`giveFeedback`](https://monadvision.com/tx/0x3c05024ac5e0f78972734ee68cce1a4bb7126b375d3500a4e6be405f4a81aef6), both from the verifier.
+5. Read the [MCP transcript](docs/agent-runs/mcp-mainnet.md): an allowed deposit with a verified, anchored proof and a blocked withdraw with nothing sent.
+6. Open [firewall #001](https://agenttrace-mainnet.vercel.app/firewalls/1): readable policy and execution history.
+7. Optional: `npm ci && node scripts/verify-proof.mjs 0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e` to recompute that proof hash from public RPC and compare it with the onchain anchor (prints `PASS`).
+8. Optional: `npm run test:contracts` to see the firewall rules, including V2 argument caps, enforced in a local EVM.
+9. Optional, with a wallet and a little testnet MON: run `/demo` on [testnet](https://agenttrace-plum.vercel.app/demo) end to end.
 
 ## Demo video and screenshots
 
@@ -490,8 +516,9 @@ From the live mainnet app, captured with `node scripts/readme-screenshots.mjs`:
 ## Roadmap
 
 - Multiple independent verifiers (quorum anchoring), so no single AgentTrace wallet decides a verdict
-- Argument-level policy (for example caps on an amount argument), not only target + selector + value
-- Outcome adapters for real Monad protocols beyond `EVENT_EMITTED`
+- Onchain argument caps on mainnet (`AgentFirewallV2` is live on testnet)
+- A per-agent vault, so tokens a protocol pays to the caller are not held in the shared firewall contract
+- More built-in outcome adapters for Monad protocols (WMON is the first)
 - Publish `agenttrace-monad` to npm; packaged MCP server
 - A configured executor that can submit `execute` from the API without weakening firewall checks
 - External contract audit
@@ -499,7 +526,7 @@ From the live mainnet app, captured with `node scripts/readme-screenshots.mjs`:
 ## Documentation
 
 - [Architecture](docs/architecture.md) · [Contracts](docs/contracts.md) · [API](docs/api.md) · [SDK](docs/sdk.md) · [Security](docs/security.md)
-- [Submission notes](docs/submission.md) · [Demo script](docs/demo-script.md) · [Demo voiceover](docs/demo-voiceover.md) · [MCP mainnet run](docs/agent-runs/mcp-mainnet.md)
+- [Submission notes](docs/submission.md) · [Demo script](docs/demo-script.md) · [Demo voiceover](docs/demo-voiceover.md) · [MCP mainnet run](docs/agent-runs/mcp-mainnet.md) · [WMON mainnet run](docs/agent-runs/wmon-mainnet.md)
 
 ## License
 
