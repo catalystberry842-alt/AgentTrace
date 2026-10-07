@@ -1,0 +1,25 @@
+{
+  "chainId": 10143,
+  "network": "Monad testnet",
+  "registry": "0xfa66d202dae4b7fb9aa5c6ee80390ca8bb48739e",
+  "demoProtocol": "0x1664be58ee54af91c756428f466bad6e4f9911c3",
+  "txs": {
+    "deployAgentFirewallV2": "0xee5c6e12c36d8953762e5d65195448b3ff950187634147788f4b284a09e5e36c",
+    "registerAgent": "0x83496602ff105076da9a03a7d88055b176d4bb9e493751e6e63ee1b76525b820",
+    "createFirewall": "0xc0b25b1f676f9e79ffda9b669fb83cb601c431971ad97e748531cc111499d9f9",
+    "allowTarget": "0x0a45fd404eabe0d20e924c4238a57a18c126147f972e290406444eda9779acd0",
+    "allowFunction": "0x553752f492c520c5f534b93758445e41066b0bd61fada00a9cdc93d2caabdad0",
+    "setArgCap": "0x08807e967244fa02514e14d55f9b1643e6608cc1c6f4a7e33813a327cde5b8f9",
+    "executeDeposit100": "0x347c1512b9ce49b8447271b596a5043eba6664a6a5f07902402ef99e133ed5e9"
+  },
+  "agentFirewallV2": "0x5b027151faa45e83ac1790a8bf5671388c640fb9",
+  "agentId": "12",
+  "firewallId": "1",
+  "allowedExecutionId": "0x89aa6f014c908b6fb2a868b2627e57ce14930adb6a34e3c12f38b82721f52cbb",
+  "blockedSimulation": {
+    "amount": "900",
+    "error": "ArgumentTooHigh(1, 0xe2bbb158, 1, 900, 500)",
+    "sent": false,
+    "checkedAt": "2026-10-07T13:46:11.936Z"
+  }
+}

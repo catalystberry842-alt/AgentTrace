@@ -9,6 +9,7 @@ import type { AgentTraceOptions } from "./types/index.ts";
 import { verifySignature } from "./webhooks/verify.ts";
 import { traceCall, TRACE_NETWORKS } from "./trace/trace.ts";
 export type { TraceCallInput, TraceCallResult, TraceNetwork } from "./trace/trace.ts";
+export { enforceLimits, validateLimits, type AmountLimit } from "./trace/policy.ts";
 
 export class AgentTrace {
   readonly agents: Agents;

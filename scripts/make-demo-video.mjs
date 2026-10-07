@@ -3,14 +3,17 @@
 // Captions are burned in, timed by sentence length within each narration clip.
 //
 //   pip install edge-tts && node scripts/make-demo-video.mjs [baseUrl]
+//   node scripts/make-demo-video.mjs --short [baseUrl]   -> docs/demo-short.mp4 from docs/demo-short-voiceover.md
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 
-const BASE = process.argv[2] ?? "https://agenttrace-mainnet.vercel.app";
-const OUT = resolve("docs/demo.mp4");
-const WORK = "/tmp/agenttrace-video";
+const SHORT = process.argv.includes("--short");
+const BASE = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "https://agenttrace-mainnet.vercel.app";
+const OUT = resolve(SHORT ? "docs/demo-short.mp4" : "docs/demo.mp4");
+const VOICEOVER = SHORT ? "docs/demo-short-voiceover.md" : "docs/demo-voiceover.md";
+const WORK = SHORT ? "/tmp/agenttrace-video-short" : "/tmp/agenttrace-video";
 const VOICE = process.env.VOICE ?? "en-US-AndrewNeural";
 const W = 1440;
 const H = 900;
@@ -19,7 +22,7 @@ const EXEC = "0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e
 rmSync(WORK, { recursive: true, force: true });
 mkdirSync(WORK, { recursive: true });
 
-const sections = readFileSync("docs/demo-voiceover.md", "utf8")
+const sections = readFileSync(VOICEOVER, "utf8")
   .split(/^## \d+\. /m)
   .slice(1)
   .map((block) => {
@@ -78,7 +81,14 @@ writeFileSync(
 );
 
 // Scene picture: URL plus the text anchors to scroll to, spread across the narration.
-const SCENES = [
+const SCENES = SHORT ? [
+  { url: `file://${WORK}/mcp.html`, anchors: ["#call3"] },
+  { url: `file://${WORK}/mcp.html`, anchors: ["#call2"] },
+  { url: "/firewalls/2", anchors: [null, "Allowed targets", "Allowed functions"] },
+  { url: `/proofs/${EXEC}`, anchors: [null, "Verification", "Anchor"] },
+  { url: `/proofs/${EXEC}`, anchors: ["Published to ERC-8004"] },
+  { url: "/", anchors: [null, "Why an independent validator"] },
+] : [
   { url: "/", anchors: [null, "How one agent action is checked"] },
   { url: "/agents/1", anchors: [null, "Public reputation"] },
   { url: "/firewalls/1", anchors: [null, "Allowed targets", "Allowed functions"] },

@@ -34,7 +34,7 @@ const STEPS = [
   { title: "Outcome", text: "Did the intended result happen?", where: "ERC-8004 registries" },
 ] as const;
 
-const SNIPPET = `import { traceCall } from "@agenttrace/sdk";
+const SNIPPET = `import { traceCall } from "agenttrace-monad";
 
 const r = await traceCall({
   network: "${IS_MAINNET ? "monad-mainnet" : "monad-testnet"}",

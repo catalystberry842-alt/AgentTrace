@@ -10,12 +10,12 @@ function SdkPage() {
     <Shell>
       <h1 className="text-2xl font-medium tracking-tight">SDK</h1>
       <p className="mt-3 max-w-xl text-sm text-muted">
-        <Mono>@agenttrace/sdk</Mono> is the TypeScript client in this repository. It is not published to npm. Network values other than Monad testnet throw before any request.
+        <Mono>agenttrace-monad</Mono> is the TypeScript client in this repository, packaged for npm but not yet published. Network values other than Monad testnet throw before any request.
       </p>
       <DeveloperNav current="/developers/sdk" />
       <CodeBlock
         language="ts"
-        code={`import { AgentTrace } from "@agenttrace/sdk";
+        code={`import { AgentTrace } from "agenttrace-monad";
 
 const agenttrace = new AgentTrace({
   apiKey: process.env.AGENTTRACE_API_KEY,

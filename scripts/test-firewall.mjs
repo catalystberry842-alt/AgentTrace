@@ -19,10 +19,12 @@ import {
 
 const root = join(import.meta.dirname, "..");
 const registryArtifact = JSON.parse(readFileSync(join(root, "contracts/out/AgentRegistry.json"), "utf8"));
-const firewallArtifact = JSON.parse(readFileSync(join(root, "contracts/out/AgentFirewall.json"), "utf8"));
+// FIREWALL_VARIANT=V2 runs the same suite against AgentFirewallV2 to prove V1 behaviour is unchanged.
+const variant = process.env.FIREWALL_VARIANT === "V2" ? "AgentFirewallV2" : "AgentFirewall";
+const firewallArtifact = JSON.parse(readFileSync(join(root, `contracts/out/${variant}.json`), "utf8"));
 const registryAbi = registryArtifact.abi;
 const firewallAbi = firewallArtifact.abi;
-const source = readFileSync(join(root, "contracts/AgentFirewall.sol"), "utf8");
+const source = readFileSync(join(root, `contracts/${variant}.sol`), "utf8");
 assert.equal(/\btx\.origin\b/.test(source), false);
 assert.equal(/\bdelegatecall\b/.test(source), false);
 assert.equal(firewallAbi.some((item) => item.type === "function" && /upgrade|admin/i.test(item.name)), false);
@@ -374,4 +376,4 @@ try {
   await vite.close();
 }
 
-console.log("firewall tests ok");
+console.log(`firewall tests ok (${variant})`);

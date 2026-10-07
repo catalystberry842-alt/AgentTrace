@@ -14,6 +14,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { AgentTraceError } from "../errors/error.ts";
+import { enforceLimits, type AmountLimit } from "./policy.ts";
 
 /**
  * Networks with a recorded AgentTrace deployment. Addresses match the committed
@@ -60,6 +61,8 @@ const firewallAbi = parseAbi([
   "error InvalidPeriod()",
   "error InvalidPolicy()",
   "error AttachedValueMismatch(uint256 attached, uint256 declared)",
+  "error ArgumentTooHigh(uint256 firewallId, bytes4 selector, uint8 argIndex, uint256 value, uint256 maxValue)",
+  "error ArgumentMissing(uint256 firewallId, bytes4 selector, uint8 argIndex)",
   "event AgentAction(uint256 indexed agentId, uint256 indexed firewallId, address indexed executor, address target, bytes4 functionSelector, uint256 value, uint256 executionNonce, bytes32 executionId, bytes32 calldataHash, uint64 timestamp)",
 ]);
 
@@ -79,6 +82,11 @@ export type TraceCallInput = {
   verifyTimeoutMs?: number;
   /** Ask the AgentTrace verifier to anchor the proof hash onchain in AgentProof. Default true. */
   anchor?: boolean;
+  /**
+   * Off-chain amount limits per selector, checked before simulation. A call that breaks one
+   * throws POLICY_REJECTED and sends nothing. See AmountLimit for what this does and does not protect.
+   */
+  limits?: readonly AmountLimit[];
 };
 
 export type TraceCallResult = {
@@ -103,6 +111,7 @@ export type TraceCallResult = {
 export async function traceCall(input: TraceCallInput): Promise<TraceCallResult> {
   const net = TRACE_NETWORKS[input.network];
   if (!net) throw new AgentTraceError("BAD_NETWORK", `Unknown network ${String(input.network)}.`, 400);
+  enforceLimits(input.limits, input.target, input.data);
   const account = typeof input.signer === "string" ? privateKeyToAccount(input.signer) : input.signer;
   const chain = defineChain({
     id: net.chainId,

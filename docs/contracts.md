@@ -68,7 +68,23 @@ Assumptions:
 - Value accounting updates before the external call. A reverting target rolls the transaction back, so nonce and spend do not persist.
 - Re-entering `execute` from the target does not impersonate the executor unless the target is the executor.
 
-## AgentProof
+## AgentFirewallV2 (testnet)
+
+Purpose: `AgentFirewall` plus onchain argument caps. The deployed `AgentFirewall` has no proxy or admin and cannot be changed, so this is a separate contract. Source: `contracts/AgentFirewallV2.sol`; artifact `contracts/out/AgentFirewallV2.json` (`npm run compile:v2`).
+
+Deployed on Monad testnet only: [`0x5b027151faa45e83ac1790a8bf5671388c640fb9`](https://testnet.monadvision.com/address/0x5b027151faa45e83ac1790a8bf5671388c640fb9), constructor argument the existing AgentRegistry `0xfa66…739e`, deploy tx [`0xee5c6e12…`](https://testnet.monadvision.com/tx/0xee5c6e12c36d8953762e5d65195448b3ff950187634147788f4b284a09e5e36c). Record: `contracts/deployments/firewall-v2-testnet.json`. Not deployed on mainnet.
+
+Added functions:
+
+- `setArgCap(firewallId, target, selector, uint8 argIndex, uint256 maxValue)`: registry owner only; the function must already be allowed. One cap per (target, selector); setting again replaces it.
+- `clearArgCap(firewallId, target, selector)`, `getArgCap(firewallId, target, selector)`
+
+Added events: `ArgCapSet`, `ArgCapCleared`. Added errors: `ArgumentTooHigh(firewallId, selector, argIndex, value, maxValue)`, `ArgumentMissing(firewallId, selector, argIndex)`, `ArgCapNotSet`.
+
+In `execute`, after the selector check: if a cap is set, the 32-byte word at `4 + 32 * argIndex` is read as `uint256`; calldata too short for it reverts `ArgumentMissing`; a value above `maxValue` reverts `ArgumentTooHigh`. Everything else, including `AgentAction` and the execution id formula, is unchanged from V1, so the proof hash below applies as is.
+
+Scope: static `uint256` (or any 32-byte word compared as `uint256`) head arguments only. Dynamic types (`bytes`, arrays, structs by offset) and cumulative per-period argument budgets are not covered.
+
 
 Purpose: store a proof hash that an off-chain verifier already checked. This contract cannot read historical receipts.
 

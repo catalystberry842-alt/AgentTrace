@@ -14,3 +14,4 @@ artifacts
 .node_modules.lock
 AGENTS.md
 AGENTS.project.md
+sdk/*.tgz

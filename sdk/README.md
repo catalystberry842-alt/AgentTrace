@@ -1,21 +1,64 @@
-# @agenttrace/sdk
+# agenttrace-monad
 
-TypeScript client for AgentTrace on Monad testnet (chain id 10143).
+TypeScript SDK for [AgentTrace](https://agenttrace-mainnet.vercel.app) on Monad. Route an AI agent's contract call through the onchain `AgentFirewall`, then get a receipt-verified proof whose hash AgentTrace anchors in `AgentProof`.
 
-This package is not published. Use it from this repository.
+- `traceCall` works on Monad mainnet (chain 143) and testnet (chain 10143).
+- Off-chain `limits` (max amount per selector) are checked before anything is simulated or sent.
+- `AgentTrace`, the typed developer API client, is Monad testnet only.
+
+Status: packaged and `npm pack` tested, **not yet published to npm**. Until it is, build it from this repository (below).
 
 ## Install
 
-The SDK ships as TypeScript source in `sdk/`. Import `@agenttrace/sdk` only after you point a package dependency at this folder. Nothing is published automatically.
+```bash
+# after publishing
+npm install agenttrace-monad viem
 
-## Quickstart
+# from this repository today
+cd sdk && npm pack            # builds dist/ and writes agenttrace-monad-0.1.0.tgz
+npm install /path/to/AgentTrace/sdk/agenttrace-monad-0.1.0.tgz viem
+```
+
+`viem` 2.40 or newer is a peer dependency. ESM only, Node 18+.
+
+## `traceCall`
+
+```ts
+import { traceCall } from "agenttrace-monad";
+import { encodeFunctionData, parseAbi, toFunctionSelector } from "viem";
+
+const abi = parseAbi(["function deposit(uint256 agentId, uint256 amount)"]);
+const result = await traceCall({
+  network: "monad-mainnet",
+  signer: process.env.AGENT_KEY as `0x${string}`, // the firewall's executor
+  firewallId: 1n,
+  target: "0x1664be58ee54af91c756428f466bad6e4f9911c3",
+  data: encodeFunctionData({ abi, functionName: "deposit", args: [1n, 100n] }),
+  // optional: refuse locally if argument 1 (amount) is above 500
+  limits: [{ selector: toFunctionSelector("deposit(uint256,uint256)"), argIndex: 1, maxAmount: 500n }],
+});
+console.log(result.proofStatus, result.proofUrl, result.anchorTxHash);
+```
+
+Errors are `AgentTraceError` with a `code`:
+
+| Code | Meaning | Sent? |
+| --- | --- | --- |
+| `POLICY_REJECTED` | An off-chain `limits` rule was broken | No |
+| `FIREWALL_REJECTED` | Simulation shows `AgentFirewall` would revert (target, selector, pause, value) | No |
+| `RPC_UNAVAILABLE` | Could not simulate | No |
+| `EXECUTION_REVERTED` | Mined but reverted | Yes |
+
+What is enforced where: target and selector allowlists, pause, executor and native MON value limits are enforced **onchain** by `AgentFirewall`. `limits` (argument caps such as a token amount) run in the agent's process: they stop a confused or prompt-injected model, not someone who holds the executor key and skips the SDK. `contracts/AgentFirewallV2.sol` implements the same rule onchain (`setArgCap`); see the repository docs for its status.
+
+## API client quickstart
 
 1. Create an API key in the developer portal. The full key is shown once.
 2. Pass it as `Authorization: Bearer`, never in a query string.
 3. Call the API. Chain writes stay `failed` with a null transaction hash until a real Monad receipt confirms them.
 
 ```ts
-import { AgentTrace } from "@agenttrace/sdk";
+import { AgentTrace } from "agenttrace-monad";
 
 const agenttrace = new AgentTrace({
   apiKey: process.env.AGENTTRACE_API_KEY!,
@@ -58,7 +101,7 @@ The header is `X-AgentTrace-Signature: sha256=<hex>` over the raw body.
 
 ## Network
 
-Monad testnet only. RPC `https://testnet-rpc.monad.xyz`. Mainnet is not implemented.
+`traceCall`: Monad mainnet and testnet. `AgentTrace` API client: Monad testnet only (RPC `https://testnet-rpc.monad.xyz`); other networks throw before any request.
 
 ## License
 

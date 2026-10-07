@@ -1,11 +1,11 @@
 # SDK
 
-Package: `@agenttrace/sdk` in `sdk/`. It is not published to npm. `viem` (2.40 or newer) is a peer dependency.
+Package: `agenttrace-monad` in `sdk/` (`cd sdk && npm pack` builds `dist/` and a tarball). It is not yet published to npm. `viem` (2.40 or newer) is a peer dependency.
 
 ## `traceCall`: one line for an existing agent
 
 ```ts
-import { traceCall } from "@agenttrace/sdk";
+import { traceCall } from "agenttrace-monad";
 
 const result = await traceCall({
   network: "monad-testnet",          // or "monad-mainnet" (real MON)
@@ -31,12 +31,21 @@ Example: [`sdk/examples/trace-call.ts`](../sdk/examples/trace-call.ts). A run on
 AGENT_KEY=0x... FIREWALL_ID=4 AGENT_ID=6 npx tsx sdk/examples/trace-call.ts
 ```
 
+### Off-chain amount limits
+
+```ts
+import { toFunctionSelector } from "viem";
+await traceCall({ ...input, limits: [{ selector: toFunctionSelector("deposit(uint256,uint256)"), argIndex: 1, maxAmount: 500n }] });
+```
+
+`argIndex` is the 0-based index of a static `uint256` argument after the selector. A call above `maxAmount` (or with calldata too short to contain the argument) throws `POLICY_REJECTED` before simulation; nothing is sent. Optional `target` scopes a rule to one contract. This runs in the agent's process. The onchain equivalent is `AgentFirewallV2.setArgCap` (testnet, see the README section "Amount limits").
+
 ## API client
 
 The `AgentTrace` class wraps the developer API. It accepts only `network: "monad-testnet"`; other values throw `MAINNET_UNAVAILABLE` before any request, because the developer API (API keys, webhooks) needs the account database, which the hosted mainnet app does not run.
 
 ```ts
-import { AgentTrace } from "@agenttrace/sdk";
+import { AgentTrace } from "agenttrace-monad";
 
 const client = new AgentTrace({
   apiKey: process.env.AGENTTRACE_API_KEY!,
@@ -86,4 +95,61 @@ npm run agent:mcp                       # start the server on stdio
 AGENT_KEY=0x... AGENT_ID=2 FIREWALL_ID=2 NETWORK=monad-mainnet npm run agent:session   # scripted session
 ```
 
+Optional `AGENT_LIMITS`: a JSON array of off-chain amount caps, checked before anything is simulated or sent (selector as hex or as a signature):
+
+```json
+[{ "selector": "deposit(uint256,uint256)", "argIndex": 1, "maxAmount": "500" }]
+```
+
+A call above a cap returns `{"allowed": false, "code": "POLICY_REJECTED", "sent": false}`. `agenttrace_policy` lists the caps under `offchainAmountLimits`.
+
 Recorded mainnet session: [agent-runs/mcp-mainnet.md](agent-runs/mcp-mainnet.md). See the README section "MCP firewall server".
+
+## One-click MCP config
+
+Prerequisite: `git clone https://github.com/catalystberry842-alt/AgentTrace && cd AgentTrace && npm ci`. Put the executor key in your environment, never in a committed file.
+
+**Cursor.** The repository ships [`.cursor/mcp.json`](../.cursor/mcp.json); opening the folder in Cursor registers the server. It uses Cursor's `${workspaceFolder}` and `${env:…}` interpolation:
+
+```json
+{
+  "mcpServers": {
+    "agenttrace": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "tsx", "${workspaceFolder}/agents/mcp-firewall/server.ts"],
+      "env": {
+        "NETWORK": "monad-mainnet",
+        "AGENT_ID": "2",
+        "FIREWALL_ID": "2",
+        "AGENT_KEY": "${env:AGENTTRACE_AGENT_KEY}",
+        "AGENT_LIMITS": "[{\"selector\":\"deposit(uint256,uint256)\",\"argIndex\":1,\"maxAmount\":\"500\"}]"
+      }
+    }
+  }
+}
+```
+
+For your own agent, change `AGENT_ID`, `FIREWALL_ID`, and `NETWORK`; copy the block into `~/.cursor/mcp.json` to use it outside this folder (replace `${workspaceFolder}` with the absolute path).
+
+**Claude Desktop.** Settings → Developer → Edit Config opens `claude_desktop_config.json` (macOS `~/Library/Application Support/Claude/`, Windows `%APPDATA%\Claude\`). Claude Desktop does not expand variables, so use an absolute path:
+
+```json
+{
+  "mcpServers": {
+    "agenttrace": {
+      "command": "npx",
+      "args": ["-y", "tsx", "/absolute/path/to/AgentTrace/agents/mcp-firewall/server.ts"],
+      "env": {
+        "NETWORK": "monad-mainnet",
+        "AGENT_ID": "2",
+        "FIREWALL_ID": "2",
+        "AGENT_KEY": "0x<executor key>",
+        "AGENT_LIMITS": "[{\"selector\":\"deposit(uint256,uint256)\",\"argIndex\":1,\"maxAmount\":\"500\"}]"
+      }
+    }
+  }
+}
+```
+
+Restart the host. Ask "what is my AgentTrace policy?" to call `agenttrace_policy`. Without `AGENT_KEY` the server still reads policy and refuses every write.

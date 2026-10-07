@@ -1,13 +1,28 @@
 {
-  "name": "@agenttrace/sdk",
+  "name": "agenttrace-monad",
   "version": "0.1.0",
-  "private": true,
+  "description": "AgentTrace for Monad: route AI-agent calls through an onchain AgentFirewall and get receipt-verified, anchored proofs. Includes traceCall, off-chain amount limits, a typed API client and webhook verification.",
   "type": "module",
-  "description": "TypeScript client for AgentTrace on Monad. traceCall routes an agent call through AgentFirewall on testnet or mainnet.",
+  "license": "MIT",
+  "author": "catalystberry842-alt",
+  "homepage": "https://agenttrace-mainnet.vercel.app",
+  "repository": { "type": "git", "url": "git+https://github.com/catalystberry842-alt/AgentTrace.git", "directory": "sdk" },
+  "bugs": { "url": "https://github.com/catalystberry842-alt/AgentTrace/issues" },
+  "keywords": ["monad", "ai-agent", "firewall", "mcp", "erc-8004", "viem", "onchain-proof"],
+  "engines": { "node": ">=18" },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./package.json": "./package.json"
   },
-  "types": "./src/index.ts",
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node fix-dts.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "prepack": "npm run build"
+  },
   "peerDependencies": {
     "viem": "^2.40.0"
   }

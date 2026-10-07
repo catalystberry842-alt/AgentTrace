@@ -60,14 +60,14 @@ function DocsPage() {
       <Section id="start" title="Quickstart">
         <ol className="list-decimal space-y-2 pl-5 text-sm">
           <li>Create an API key. Copy it then. It is not shown again.</li>
-          <li>Use the SDK in this repository. <Mono>@agenttrace/sdk</Mono> is not published to npm.</li>
+          <li>Use the SDK in this repository. <Mono>agenttrace-monad</Mono> is packaged for npm but not yet published.</li>
           <li>Create an agent. Until the registry is deployed, the response is <Mono>failed</Mono>, with a null agent id and a null transaction hash.</li>
           <li>Create a firewall the same way. No firewall id is assigned without a confirmed <Mono>createFirewall</Mono> receipt.</li>
           <li>Execute only through <Mono>firewalls.execute</Mono>. There is no direct-execution method.</li>
           <li>Wait for a proof. The SDK stops at its timeout and does not report a receipt as verified unless the verifier did.</li>
           <li>Verify an outcome with <Mono>EVENT_EMITTED</Mono> and a Solidity event signature. Demo Protocol state checks need <Mono>source</Mono>, <Mono>field</Mono>, and <Mono>expectedValue</Mono>. Other shapes are rejected.</li>
         </ol>
-        <Code>{`import { AgentTrace } from "@agenttrace/sdk";
+        <Code>{`import { AgentTrace } from "agenttrace-monad";
 
 const agenttrace = new AgentTrace({
   apiKey: process.env.AGENTTRACE_API_KEY,

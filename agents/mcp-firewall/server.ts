@@ -5,12 +5,15 @@
 // nothing), then sent from the agent's executor key, then verified and anchored by AgentTrace.
 //
 // Env: AGENT_KEY (the firewall executor), FIREWALL_ID, AGENT_ID,
-//      NETWORK=monad-mainnet | monad-testnet (default testnet), AGENTTRACE_URL (optional).
+//      NETWORK=monad-mainnet | monad-testnet (default testnet), AGENTTRACE_URL (optional),
+//      AGENT_LIMITS (optional) JSON array of off-chain amount caps checked before anything is sent:
+//        [{"selector":"0xe2bbb158","argIndex":1,"maxAmount":"500"}]   (deposit amount <= 500)
+//      selector may also be a function signature, e.g. "deposit(uint256,uint256)".
 //
 // Transport: MCP over stdio, newline-delimited JSON-RPC 2.0. No dependencies beyond viem.
 import { createInterface } from "node:readline";
-import { encodeFunctionData, isAddress, isHex, parseAbi } from "viem";
-import { TRACE_NETWORKS, traceCall, type TraceNetwork } from "../../sdk/src/index.ts";
+import { encodeFunctionData, isAddress, isHex, parseAbi, toFunctionSelector, type Address, type Hex } from "viem";
+import { TRACE_NETWORKS, traceCall, enforceLimits, validateLimits, type AmountLimit, type TraceNetwork } from "../../sdk/src/index.ts";
 
 const network = (process.env.NETWORK ?? "monad-testnet") as TraceNetwork;
 const net = TRACE_NETWORKS[network];
@@ -20,6 +23,21 @@ const firewallId = BigInt(process.env.FIREWALL_ID ?? "0");
 const agentId = BigInt(process.env.AGENT_ID ?? "0");
 const key = process.env.AGENT_KEY as `0x${string}` | undefined;
 const DEMO = "0x1664be58ee54af91c756428f466bad6e4f9911c3" as const;
+
+function parseLimits(raw: string | undefined): AmountLimit[] {
+  if (!raw?.trim()) return [];
+  const rows = JSON.parse(raw) as Array<{ selector: string; target?: string; argIndex: number; maxAmount: string | number }>;
+  if (!Array.isArray(rows)) throw new Error("AGENT_LIMITS must be a JSON array");
+  const limits = rows.map((row) => ({
+    selector: (row.selector.startsWith("0x") ? row.selector : toFunctionSelector(row.selector)) as Hex,
+    target: row.target as Address | undefined,
+    argIndex: Number(row.argIndex),
+    maxAmount: BigInt(row.maxAmount),
+  }));
+  validateLimits(limits);
+  return limits;
+}
+const limits = parseLimits(process.env.AGENT_LIMITS);
 const demoAbi = parseAbi([
   "function deposit(uint256 agentId, uint256 amount)",
   "function withdraw(uint256 agentId, uint256 amount)",
@@ -57,9 +75,15 @@ function text(value: unknown, isError = false) {
 }
 
 async function guarded(target: `0x${string}`, data: `0x${string}`, value = 0n) {
+  try {
+    // Off-chain limits first, so a capped call is refused for its real reason even without a key.
+    enforceLimits(limits, target, data);
+  } catch (error) {
+    return text({ allowed: false, code: (error as { code?: string }).code ?? "ERROR", message: (error as Error).message, sent: false }, true);
+  }
   if (!key) return text("AGENT_KEY is not set, so this server cannot sign.", true);
   try {
-    const result = await traceCall({ network, signer: key, firewallId, target, data, value, appUrl });
+    const result = await traceCall({ network, signer: key, firewallId, target, data, value, appUrl, limits });
     return text({ allowed: true, ...result });
   } catch (error) {
     const code = (error as { code?: string }).code ?? "ERROR";
@@ -87,6 +111,7 @@ async function callTool(name: string, args: Record<string, unknown>) {
       allowedTargets: firewall.allowedTargets.filter((t: any) => t.active).map((t: any) => `${t.name || "contract"} ${t.target}`),
       allowedFunctions: firewall.allowedFunctions.filter((f: any) => f.active).map((f: any) => `${f.selector} on ${f.target}`),
       page: `${appUrl}/firewalls/${firewall.id}`,
+      offchainAmountLimits: limits.map((l) => ({ selector: l.selector, target: l.target ?? "any", argIndex: l.argIndex, maxAmount: l.maxAmount.toString(), enforcedBy: "this MCP server before sending" })),
     });
   }
   if (name === "demo_deposit" || name === "demo_withdraw") {

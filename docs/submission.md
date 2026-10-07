@@ -16,14 +16,18 @@ A 5-minute path is in the README: [Judge quick check](../README.md#judge-quick-c
 - Live app on Monad mainnet (chain 143): https://agenttrace-mainnet.vercel.app
 - Live app on Monad testnet (chain 10143): https://agenttrace-plum.vercel.app
 - Mainnet example: agent [#001](https://agenttrace-mainnet.vercel.app/agents/1) (ERC-8004 #10280), firewall [#001](https://agenttrace-mainnet.vercel.app/firewalls/1), execution proof [0x52c98d50…](https://agenttrace-mainnet.vercel.app/proofs/0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e) anchored in [`0x2151d023…`](https://monadvision.com/tx/0x2151d023a27cc9f1f1aecda0b8dc74ed44e7e9b5936a7b18c5ca2b1127feff08), ERC-8004 `validationResponse` [`0xd727a688…`](https://monadvision.com/tx/0xd727a688ae93a2078ee9a0e9e39d31bb2c35ed4de8364640a731abd9524d4231) and `giveFeedback` [`0x3c05024a…`](https://monadvision.com/tx/0x3c05024ac5e0f78972734ee68cce1a4bb7126b375d3500a4e6be405f4a81aef6)
-- Demo video (about 2 min 50 s, narrated, recorded on the live mainnet app): [docs/demo.mp4](demo.mp4). Script: [docs/demo-voiceover.md](demo-voiceover.md)
+- Short demo video (about 90 s, opens with the blocked call): [docs/demo-short.mp4](demo-short.mp4). Script: [docs/demo-short-voiceover.md](demo-short-voiceover.md)
+- Full demo video (about 2 min 50 s, narrated, recorded on the live mainnet app): [docs/demo.mp4](demo.mp4). Script: [docs/demo-voiceover.md](demo-voiceover.md)
+- Recompute any anchored proof from public RPC, without AgentTrace: `node scripts/verify-proof.mjs <executionId|txHash> [--chain mainnet|testnet]` prints each check and `PASS`/`FAIL`. It passes for mainnet `0x52c98d50…` (agent #001) and `0x8361810c…` (agent #002), and testnet `0x3242aead…` / anchors `0x577824ab…` and `0x466a2c1e…`
+- Onchain amount cap (testnet): `AgentFirewallV2` [`0x5b027151…`](https://testnet.monadvision.com/address/0x5b027151faa45e83ac1790a8bf5671388c640fb9) with `setArgCap`; agent #012 deposit of 100 executed ([`0x347c1512…`](https://testnet.monadvision.com/tx/0x347c1512b9ce49b8447271b596a5043eba6664a6a5f07902402ef99e133ed5e9)) and a deposit of 900 rejected with `ArgumentTooHigh(…, 900, 500)`, nothing sent. Full table in the README section "Amount limits"
+- SDK packaged for npm as `agenttrace-monad` (`cd sdk && npm pack`; not yet published) and a one-click MCP config for Cursor ([`.cursor/mcp.json`](../.cursor/mcp.json)) and Claude Desktop ([docs/sdk.md](sdk.md#one-click-mcp-config))
 - Third-party agent over MCP on mainnet: Treasury Agent #002 with its own executor key; a scripted MCP session made a deposit that came back `receipt_verified` and anchored ([`0x6d3fda85…`](https://monadvision.com/tx/0x6d3fda85231be2a7f58798157f7e07dc67167b16cd69061825023ea95bb4bfc1)), and a withdraw was rejected by the firewall with nothing sent. Transcript: [docs/agent-runs/mcp-mainnet.md](agent-runs/mcp-mainnet.md)
 - Indexing on Envio HyperSync (mainnet and testnet), with RPC fallback
 - A complete live example: agent [#006](https://agenttrace-plum.vercel.app/agents/6), firewall [#004](https://agenttrace-plum.vercel.app/firewalls/4), execution proof [0x3242aead…](https://agenttrace-plum.vercel.app/proofs/0x3242aeadc1ae0b511746852d623e71db91e3a49dbbe27662a886d65260c204df) (anchored onchain in [`0x577824ab…`](https://testnet.monadvision.com/tx/0x577824ab9bef8a84f9b2b0063d8bd580986e456d10a7837861483f9bc26737c4)), and outcome [Deposited 100](https://agenttrace-plum.vercel.app/outcomes/0x3242aeadc1ae0b511746852d623e71db91e3a49dbbe27662a886d65260c204df); deposit transaction [0x6fbbd950…](https://testnet.monadvision.com/tx/0x6fbbd95042890cc346043ec2a79bb070929588580f49b197a4408cef47905c58)
 - `/demo`: identity → firewall → allowed deposit → proof → outcome → onchain anchor → blocked withdraw. Running it needs a browser wallet on Monad testnet with a little testnet MON (under 0.1 MON for the five transactions); the withdraw is rejected by the firewall in simulation, so no transaction is sent for it
 - Passport, firewall, proof, and outcome pages, which cite indexed chain data and link to the Monad explorer
 - `docs/contracts.md` for the proof hash
-- `npm run test:contracts` for local EVM checks of the registry, firewall, proof, demo, developer API, and reputation logic
+- `npm run test:contracts` for local EVM checks of the registry, firewall (V1, and V1's suite rerun against V2), V2 argument caps, proof, demo, developer API, and reputation logic
 - Screenshots: [docs/screenshots](screenshots)
 
 Earlier test runs registered agents #001–#005 and #007–#011 from the same wallet. Onchain history cannot be deleted, so they were deactivated with `AgentRegistry.deactivateAgent`; the agents list hides deactivated agents by default and shows them under All or Inactive.
@@ -34,7 +38,8 @@ Earlier test runs registered agents #001–#005 and #007–#011 from the same wa
 - Outcome checks: `EVENT_EMITTED` for any contract; balance/state checks only for Demo Protocol.
 - Live examples target `DemoProtocol` (accounting only). No third-party production protocol integrated yet.
 - Mainnet has two agents: #001 (ERC-8004 #10280) and Treasury Agent #002 (MCP; not ERC-8004 linked).
-- Firewall policy is target + selector + value, not argument values. Not audited.
+- The deployed `AgentFirewall` (mainnet and testnet) checks target + selector + value, not argument values. Onchain argument caps exist in `AgentFirewallV2`, deployed on testnet only and not yet indexed by the app; on mainnet an amount cap is enforced off-chain by the SDK/MCP server (it stops a confused model, not a holder of the executor key who skips the SDK). Not audited.
+- `agenttrace-monad` is packaged but not published to npm.
 
 ## Verified build
 

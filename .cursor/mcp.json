@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "agenttrace": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "tsx", "${workspaceFolder}/agents/mcp-firewall/server.ts"],
+      "env": {
+        "NETWORK": "monad-mainnet",
+        "AGENT_ID": "2",
+        "FIREWALL_ID": "2",
+        "AGENT_KEY": "${env:AGENTTRACE_AGENT_KEY}",
+        "AGENT_LIMITS": "[{\"selector\":\"deposit(uint256,uint256)\",\"argIndex\":1,\"maxAmount\":\"500\"}]"
+      }
+    }
+  }
+}
