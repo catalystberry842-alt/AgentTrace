@@ -25,7 +25,7 @@ export function parseCreateInput(
 
   if (!name) return { ok: false, error: "Agent name is required." };
   if (name.length > 64) return { ok: false, error: "Agent name must be 64 characters or fewer." };
-  if (/[\u0000-\u001F]/.test(name)) return { ok: false, error: "Agent name contains invalid characters." };
+  if ([...name].some((char) => char.charCodeAt(0) < 0x20)) return { ok: false, error: "Agent name contains invalid characters." };
   if (!description) return { ok: false, error: "Description is required." };
   if (description.length > 280) {
     return { ok: false, error: "Description must be 280 characters or fewer." };

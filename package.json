@@ -1,5 +1,12 @@
 {
-  "name": "app-builder-workspace",
+  "name": "agenttrace",
+  "version": "1.0.0",
+  "description": "Independent validator for onchain AI agents on Monad: firewall, receipt-verified proofs, outcome verdicts published to ERC-8004.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/catalystberry842-alt/AgentTrace"
+  },
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -12,6 +19,7 @@
   "scripts": {
     "dev": "node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
     "build": "node scripts/with-app-env.mjs vite build && node scripts/copy-pglite-assets.mjs && npm run db:migrate",
+    "build:app": "node scripts/with-app-env.mjs vite build",
     "db:migrate": "node scripts/migrate.mjs",
     "deploy:testnet": "node scripts/deploy-contracts.mjs",
     "deploy:mainnet": "MONAD_NETWORK=mainnet node scripts/deploy-contracts.mjs --confirm-mainnet",

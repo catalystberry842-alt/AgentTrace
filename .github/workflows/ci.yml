@@ -1,0 +1,31 @@
+# Typecheck, lint, unit tests, every contract suite (V1, V2, V3, quorum) and both network builds.
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - name: Contract artifacts match sources
+        run: |
+          npm run compile:v3
+          git diff --exit-code contracts/out/AgentFirewallV3.json contracts/out/AgentVault.json contracts/out/AgentProofQuorum.json
+      - run: npm run test:contracts
+      - name: Build testnet app
+        run: npm run build:app
+      - name: Build mainnet app
+        run: npm run build:app
+        env:
+          VITE_MONAD_NETWORK: mainnet

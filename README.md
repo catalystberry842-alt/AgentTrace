@@ -1,5 +1,7 @@
 # AgentTrace
 
+[![ci](https://github.com/catalystberry842-alt/AgentTrace/actions/workflows/ci.yml/badge.svg)](https://github.com/catalystberry842-alt/AgentTrace/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Every agent leaves a trace.** An independent validator and audit trail for onchain AI agents on Monad, publishing its verdicts to the official ERC-8004 registries.
 
 > Monad Metropolis · Track 04: Trust, Identity & AI
@@ -481,15 +483,16 @@ With the GitHub repository connected to the Vercel project, every push to `main`
 ## Repository structure
 
 ```text
-contracts/             AgentRegistry, AgentFirewall, AgentFirewallV2, AgentProof, DemoProtocol (.sol) + compiled out/, deployments/
+contracts/             AgentRegistry, AgentFirewall(V2, V3), AgentVault, AgentProof, AgentProofQuorum, DemoProtocol + compiled out/, deployments/
 sdk/                   agenttrace-monad: traceCall, typed API client, webhook verify, examples/
 agents/mcp-firewall/   MCP server (server.ts) and scripted mainnet session (run-session.ts)
 src/routes/            TanStack Start pages (agents, firewalls, proofs, outcomes, demo, developers) and api/
-src/lib/chain/         deployments, ABIs, indexer, HyperSync, proof assess/hash, ERC-8004, reputation
+src/lib/chain/         deployments, ABIs, indexer, HyperSync, proof assess/hash, ERC-8004, reputation, one-click setup
 src/lib/developer/     API keys, rate limits, webhooks
-scripts/               deploy, contract tests (local EVM), verify-proof.mjs, demo video + screenshot generators
+scripts/               deploy (V1, V3), contract tests (local EVM), verify-proof.mjs, second-verifier.mjs, demo video + screenshot generators
 migrations/            SQL schema for Postgres / PGLite
-docs/                  architecture, contracts, api, sdk, security, submission, demo assets
+docs/                  trust upgrades, architecture, contracts, api, sdk, security, submission, demo assets
+.github/workflows/     ci (typecheck, lint, tests, contract suites, both builds), keep-warm
 ```
 
 ## Judge quick check

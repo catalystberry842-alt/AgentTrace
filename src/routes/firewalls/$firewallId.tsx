@@ -7,7 +7,7 @@ import { GROK_PROVIDERS, authEnabled, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Shell } from "@/components/shell";
 import { AddressInput, AmountInput, Button, ChainError, Checkbox, CodeInput, ConfirmDialog, ErrorNote, Fact, Field, Mono, SkeletonLines, StatusText, TextInput } from "@/components/ui";
-import { AddressValue, CopyButton, TxValue } from "@/components/values";
+import { AddressValue, TxValue } from "@/components/values";
 import { addressUrl, formatAgentId, formatDuration, formatWei, functionName, proofStatusLabel, shortHash, statusTone } from "@/lib/format";
 import { toFunctionSelector } from "viem";
 import { toast } from "sonner";

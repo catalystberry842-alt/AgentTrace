@@ -30,8 +30,30 @@ const STEPS = [
   { title: "Identity", text: "A permanent agent id, owned by a wallet.", where: "AgentRegistry" },
   { title: "Control", text: "Allowed contracts, functions, and value.", where: "AgentFirewall" },
   { title: "Execution", text: "The call runs only through the firewall.", where: "AgentAction event" },
-  { title: "Proof", text: "Receipt re-checked, hash anchored onchain.", where: "AgentProof" },
-  { title: "Outcome", text: "Did the intended result happen?", where: "ERC-8004 registries" },
+  { title: "Proof", text: "Receipt re-checked (14 checks), hash anchored onchain.", where: "AgentProof" },
+  { title: "Outcome verdict", text: "Did the call achieve its purpose, not just succeed?", where: "Outcome adapters" },
+  { title: "Publish", text: "Verdicts written where any wallet or agent reads them.", where: "ERC-8004 registries" },
+] as const;
+
+const TRUST = [
+  {
+    title: "One-click setup",
+    text: "Connect once, confirm once (EIP-5792 batch). A scoped session key acts for the agent; everything after that verifies itself.",
+    status: "Live in /demo",
+    live: true,
+  },
+  {
+    title: "Verifier quorum",
+    text: "Proofs anchor only when k-of-n independent verifiers agree. Conflicts are marked disputed; anyone can challenge onchain.",
+    status: "Tested · deploying",
+    live: false,
+  },
+  {
+    title: "Per-agent vaults",
+    text: "Each agent calls through its own vault, so protocol payouts never sit in a shared contract. Session keys expire.",
+    status: "Tested · deploying",
+    live: false,
+  },
 ] as const;
 
 const SNIPPET = `import { traceCall } from "agenttrace-monad";
@@ -178,15 +200,16 @@ function Landing({ pending }: { pending: boolean }) {
         </p>
         <h1 className="type-display mt-5 max-w-2xl text-balance">Every agent leaves a trace.</h1>
         <p className="mt-5 max-w-xl text-base text-pretty text-muted">
-          AgentTrace is an independent validator and audit trail for onchain agents. It limits what an agent may call,
-          proves what it actually did from the Monad receipt, and publishes the verdict to ERC-8004.
+          AgentTrace is an independent validator for onchain agents. It fences what an agent may call, checks from the
+          Monad receipt whether the call achieved its purpose, and publishes that verdict to the shared ERC-8004
+          registries, so anyone can read an agent's record without trusting this site.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
           <Link to="/proofs/$proofId" params={{ proofId: SHOWCASE.proof }} className={primaryClass}>
             See a verified execution
           </Link>
           <Link to="/demo" className={secondaryClass}>
-            Run the demo
+            One-click demo
           </Link>
           {pending ? <div className="h-11 w-full animate-pulse rounded-sm bg-subtle sm:w-40" /> : null}
           {!pending && !authEnabled ? (
@@ -247,6 +270,27 @@ function Landing({ pending }: { pending: boolean }) {
         <pre className="type-technical overflow-x-auto rounded-sm border border-border bg-subtle/40 p-4 text-xs leading-relaxed text-muted">
           <code>{SNIPPET}</code>
         </pre>
+      </section>
+
+      <section className="mt-14 border-t border-border pt-8" aria-labelledby="trust">
+        <h2 id="trust" className="text-sm font-medium">
+          Trust model
+        </h2>
+        <p className="mt-3 max-w-2xl text-sm text-pretty text-muted">
+          What AgentTrace still asks you to trust, and how each part is being removed.
+        </p>
+        <ul className="mt-4 divide-y divide-border border-y border-border text-sm">
+          {TRUST.map((item) => (
+            <li key={item.title} className="grid gap-1 py-3 sm:grid-cols-[12rem_1fr_9rem] sm:items-baseline sm:gap-4">
+              <span className="font-medium">{item.title}</span>
+              <span className="text-muted">{item.text}</span>
+              <span className={`text-xs sm:text-right ${item.live ? "text-ok" : "text-faint"}`}>{item.status}</span>
+            </li>
+          ))}
+        </ul>
+        <a href={`${REPO}/blob/main/docs/trust-upgrades.md`} className="mt-3 inline-block text-sm text-muted hover:text-fg" rel="noreferrer">
+          How disputes, vaults and session keys work
+        </a>
       </section>
 
       <section className="mt-14 grid gap-10 border-t border-border pt-8 md:grid-cols-2">

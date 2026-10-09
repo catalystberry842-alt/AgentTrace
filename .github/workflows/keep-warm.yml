@@ -13,7 +13,7 @@ jobs:
       - name: Warm both networks
         run: |
           for base in https://agenttrace-mainnet.vercel.app https://agenttrace-plum.vercel.app; do
-            for path in / /agents /proofs /api/proofs /api/agents/1 /api/firewalls/1; do
+            for path in / /demo /agents /proofs /api/proofs /api/agents/1 /api/firewalls/1; do
               code=$(curl -s -o /dev/null -w '%{http_code} %{time_total}s' --max-time 60 "$base$path" || true)
               echo "$base$path $code"
             done
