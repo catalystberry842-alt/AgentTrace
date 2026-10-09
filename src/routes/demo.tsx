@@ -23,6 +23,8 @@ import { Button, ChainError, Mono, SkeletonLines, StatusText } from "@/component
 import { demoProtocolAbi } from "@/lib/chain/abi";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { formatAgentId, formatAgentLabel, proofStatusLabel, txUrl } from "@/lib/format";
+import { useWalletAccount } from "@/lib/chain/wallet-account";
+import { isMobileBrowser, metamaskDeepLink } from "@/lib/chain/injected";
 
 export const Route = createFileRoute("/demo")({ component: DemoPage });
 
@@ -95,6 +97,8 @@ function sleep(ms: number) {
 
 function DemoPage() {
   const { user, isPending } = useCurrentUserState();
+  const wallet = useWalletAccount();
+  const [mobile, setMobile] = useState(false);
   const [ready, setReady] = useState(false);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [gateNote, setGateNote] = useState<"rpc" | "missing" | null>(null);
@@ -111,6 +115,7 @@ function DemoPage() {
 
   useEffect(() => {
     setSaved(loadSaved());
+    setMobile(isMobileBrowser());
     setReady(true);
   }, []);
 
@@ -190,7 +195,7 @@ function DemoPage() {
    * One click: connect once, confirm the setup once (EIP-5792 batch when the wallet supports it),
    * then the agent's session key acts and AgentTrace verifies everything by itself.
    */
-  async function runOneClick() {
+  async function runOneClick(fresh = false) {
     if (!configured) return;
     setBusy(true);
     setFailed(null);
@@ -213,7 +218,7 @@ function DemoPage() {
       const executor = oc.sessionAccount(key).address.toLowerCase() as `0x${string}`;
       // A run that stopped after setup resumes with the same agent, firewall and session key.
       const resume =
-        saved.oneClick && saved.agentId && saved.firewallId && saved.executor === executor
+        !fresh && saved.oneClick && saved.agentId && saved.firewallId && saved.executor === executor
           ? { agentId: BigInt(saved.agentId), firewallId: BigInt(saved.firewallId), txHashes: [] as `0x${string}`[], batched: Boolean(saved.batched), v3: Boolean(saved.vaultMode) }
           : null;
       const setup = resume ?? await oc.runSetup(
@@ -643,6 +648,30 @@ function DemoPage() {
         ))}
       </ol>
 
+      <div className="mt-6 flex flex-wrap items-center gap-3 text-sm" aria-live="polite">
+        {wallet.address ? (
+          <span>
+            <StatusText tone="ok">Wallet connected</StatusText> <Mono>{`${wallet.address.slice(0, 6)}…${wallet.address.slice(-4)}`}</Mono>
+          </span>
+        ) : wallet.ready && !wallet.available && mobile ? (
+          <a href={metamaskDeepLink()} className="underline">
+            Open this demo in the MetaMask app
+          </a>
+        ) : (
+          <Button type="button" variant="secondary" disabled={!wallet.ready} onClick={() => void wallet.connect()}>
+            Connect wallet
+          </Button>
+        )}
+        {wallet.error ? <span className="text-danger">{wallet.error}</span> : null}
+        {wallet.ready && !wallet.available && !wallet.error ? (
+          <span className="text-muted">
+            {mobile
+              ? "Phone browsers have no wallet. Open this page in your wallet app's built-in browser."
+              : "No wallet detected. Install or unlock MetaMask, Rabby or OKX, then reload."}
+          </span>
+        ) : null}
+      </div>
+
       {configured === null ? <div className="mt-10"><SkeletonLines /></div> : null}
       {configured === false && gateNote === "rpc" ? (
         <div className="mt-8 max-w-xl">
@@ -682,8 +711,16 @@ function DemoPage() {
               the same steps queued back to back, with no clicks in between.
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Button type="button" disabled={busy || saved.outcomeStatus === "verified"} onClick={() => void runOneClick()}>
-                {saved.outcomeStatus === "verified" ? "Demo complete" : "Run one-click demo"}
+              <Button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  const again = saved.outcomeStatus === "verified";
+                  if (again) reset();
+                  void runOneClick(again);
+                }}
+              >
+                {saved.outcomeStatus === "verified" ? "Run again with a new agent" : "Run one-click demo"}
               </Button>
               {saved.oneClick && saved.setupTxHashes?.length ? (
                 <span className="text-xs text-muted">

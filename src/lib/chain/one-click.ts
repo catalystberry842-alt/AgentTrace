@@ -32,6 +32,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { agentFirewallAbi, agentRegistryAbi, demoProtocolAbi } from "@/lib/chain/abi";
 import { MONAD } from "@/lib/chain/network";
 import { encodeCapabilities } from "@/lib/agents/capabilities";
+import { injectedProvider, noWalletMessage } from "@/lib/chain/injected";
 
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -60,8 +61,8 @@ const chain = defineChain({
 });
 
 function injected(): EthereumProvider {
-  const eth = (window as Window & { ethereum?: EthereumProvider }).ethereum;
-  if (!eth?.request) throw new Error("No wallet found in this browser.");
+  const eth = injectedProvider();
+  if (!eth) throw new Error(noWalletMessage());
   return eth;
 }
 

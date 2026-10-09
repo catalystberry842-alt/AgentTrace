@@ -3,6 +3,7 @@ import { defineChain } from "viem";
 import { agentFirewallAbi, agentRegistryAbi } from "@/lib/chain/abi";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { encodeCapabilities } from "@/lib/agents/capabilities";
+import { injectedProvider, noWalletMessage, waitForProvider } from "@/lib/chain/injected";
 
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -26,10 +27,8 @@ export type ChainSigner = {
 };
 
 function provider(): EthereumProvider {
-  const eth = (window as Window & { ethereum?: EthereumProvider }).ethereum;
-  if (!eth?.request) {
-    throw new Error("No wallet found in this browser. Install one to authorize registration.");
-  }
+  const eth = injectedProvider();
+  if (!eth) throw new Error(noWalletMessage());
   return eth;
 }
 
@@ -93,7 +92,7 @@ async function waitForInclusion(eth: EthereumProvider, hash: `0x${string}`, time
 }
 
 export async function getSigner(): Promise<ChainSigner> {
-  const eth = provider();
+  const eth = (await waitForProvider()) ?? provider();
   let accounts: unknown;
   try {
     accounts = await eth.request({ method: "eth_requestAccounts" });

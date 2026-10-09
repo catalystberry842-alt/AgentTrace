@@ -1,15 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-
-type InjectedProvider = {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-  on?: (event: string, handler: (...args: unknown[]) => void) => void;
-  removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
-};
+import { injectedProvider, noWalletMessage, waitForProvider, type InjectedProvider } from "@/lib/chain/injected";
 
 function injected(): InjectedProvider | null {
-  if (typeof window === "undefined") return null;
-  const eth = (window as Window & { ethereum?: InjectedProvider }).ethereum;
-  return eth?.request ? eth : null;
+  return injectedProvider();
 }
 
 function firstAccount(value: unknown): `0x${string}` | null {
@@ -36,13 +29,27 @@ export function useWalletAccount(): {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const eth = injected();
-    setAvailable(Boolean(eth));
-    if (!eth) {
-      setReady(true);
-      return;
-    }
     let cancelled = false;
+    const eth = injected();
+    if (!eth) {
+      // Wallets that only announce via EIP-6963 can answer a moment after load.
+      void waitForProvider().then((late) => {
+        if (cancelled) return;
+        setAvailable(Boolean(late));
+        setReady(true);
+        if (!late) return;
+        late
+          .request({ method: "eth_accounts" })
+          .then((accounts) => {
+            if (!cancelled) setAddress(firstAccount(accounts));
+          })
+          .catch(() => undefined);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+    setAvailable(true);
     eth
       .request({ method: "eth_accounts" })
       .then((accounts) => {
@@ -61,11 +68,12 @@ export function useWalletAccount(): {
   }, []);
 
   const connect = useCallback(async () => {
-    const eth = injected();
+    const eth = injected() ?? (await waitForProvider());
     if (!eth) {
-      setError("No wallet found in this browser.");
+      setError(noWalletMessage());
       return;
     }
+    setAvailable(true);
     setError(null);
     try {
       setAddress(firstAccount(await eth.request({ method: "eth_requestAccounts" })));
