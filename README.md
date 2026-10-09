@@ -4,7 +4,11 @@
 
 > Monad Metropolis · Track 04: Trust, Identity & AI
 
-An agent holding a wallet can call anything, and afterwards nobody can easily say *which* agent acted, *what it was allowed to do*, *what actually ran*, or *whether it worked*. AgentTrace turns each agent call into four separate, checkable facts: an onchain **identity** (`AgentRegistry`), an onchain **permission firewall** that is the only path for the call (`AgentFirewall`), a **receipt-verified execution proof** whose hash is anchored onchain (`AgentProof`), and a separate **outcome verdict**. Proof and outcome verdicts are then written to the canonical **ERC-8004 Validation and Reputation registries** on Monad, so any wallet, marketplace, or other agent can read them without trusting this app. It runs live on Monad mainnet and testnet, and plugs into existing agents through a one-function SDK (`traceCall`) or an MCP server.
+An agent holding a wallet can call anything, and afterwards nobody can easily say *which* agent acted, *what it was allowed to do*, *what actually ran*, or *whether it worked*. The receipt already says what ran. What is missing is a **verdict on whether the call achieved its purpose, published where every wallet, marketplace and agent already looks**. That is AgentTrace's core: a separate **outcome verdict** (did the `Deposited 100` / WMON `Deposit` actually happen, not just "tx succeeded"; anything it cannot check is `unverifiable`, never "verified"), written to the canonical **ERC-8004 Validation and Reputation registries** on Monad, so anyone can read it without trusting this app.
+
+Around that verdict sit the facts it depends on: an onchain **identity** (`AgentRegistry`), an onchain **permission firewall** that is the only path for the call (`AgentFirewall`), and a **receipt-verified execution proof** (14 checks) whose hash is anchored onchain (`AgentProof`) so a verdict cannot later be re-pointed at another execution. It runs live on Monad mainnet and testnet, plugs into existing agents through a one-function SDK (`traceCall`) or an MCP server, and the [`/demo`](https://agenttrace-plum.vercel.app/demo) runs end to end from **one wallet connection and one confirmation**.
+
+**New: trust upgrades** ([details](docs/trust-upgrades.md)) answering review feedback: a **multi-verifier quorum with onchain disputes** (`AgentProofQuorum` + an independently run second verifier), **per-agent custody** (`AgentFirewallV3`: every agent gets its own `AgentVault`, plus expiring **session keys** and one-transaction setup), and the **one-click demo**. The V3 contracts are written and tested; deployment is one command (see [Trust upgrades](#trust-upgrades-verifier-quorum-per-agent-vaults-one-click-setup)).
 
 | | |
 | --- | --- |
@@ -22,6 +26,7 @@ An agent holding a wallet can call anything, and afterwards nobody can easily sa
 - [Architecture](#architecture)
 - [Contracts](#contracts)
 - [ERC-8004 integration](#erc-8004-integration)
+- [Trust upgrades: verifier quorum, per-agent vaults, one-click setup](#trust-upgrades-verifier-quorum-per-agent-vaults-one-click-setup)
 - [SDK: `traceCall`](#sdk-tracecall)
 - [MCP firewall server](#mcp-firewall-server-mainnet)
 - [Real protocol on mainnet: WMON Agent #003](#real-protocol-on-mainnet-wmon-agent-003)
@@ -184,6 +189,18 @@ Live examples:
 Anyone can read it back: on mainnet, `ValidationRegistry.getValidationStatus(0xad2bca96c12f0a14e7a0377dacc7a7bbfa58e47be0401935c35beba2ab27103d)` returns validator `0x77a5…0D85`, agent 10280, response 100, tag `agenttrace-execution` (checked against `rpc.monad.xyz` on 7 October 2026). `ReputationRegistry.getSummary(agentId, [verifier], "", "")` returns count 1, value 100.
 
 Code: [`src/lib/chain/erc8004.ts`](src/lib/chain/erc8004.ts) (addresses and ABIs), [`src/lib/chain/erc8004.server.ts`](src/lib/chain/erc8004.server.ts), [`src/lib/chain/reputation.server.ts`](src/lib/chain/reputation.server.ts).
+
+## Trust upgrades: verifier quorum, per-agent vaults, one-click setup
+
+Full write-up: [docs/trust-upgrades.md](docs/trust-upgrades.md).
+
+**Disputes and a second verifier ([`AgentProofQuorum`](contracts/AgentProofQuorum.sol)).** No single wallet decides a verdict. An owner-managed verifier set (intended: a multisig) with a threshold, e.g. 2 of 3. Each verifier recomputes the proof hash from the Monad receipt on its own and attests; the proof is anchored only when `threshold` verifiers attested the *same* hash (same `ExecutionProofAnchored` event as `AgentProof`, and `anchorProof` is kept as an alias, so the server and `verify-proof.mjs` work unchanged). Two verifiers attesting different hashes mark the execution `Disputed` forever. **Anyone** can `challenge(executionId, claimedHash, evidenceURI)` with the output of `scripts/verify-proof.mjs`; verifiers that agree `withdrawAttestation`, and an anchor that falls below threshold becomes `Revoked`. Every step is an event; nothing is edited. [`scripts/second-verifier.mjs`](scripts/second-verifier.mjs) is a verifier with no shared code path, database or key with the hosted server (`--watch` to follow new executions). On ERC-8004 each verifier posts its own `validationResponse`, so consumers can require k-of-n validators.
+
+**Per-agent custody and session keys ([`AgentFirewallV3`](contracts/AgentFirewallV3.sol) + [`AgentVault`](contracts/AgentVault.sol)).** Every firewall gets its own vault (CREATE2, address known up front) and `execute` calls the target *through* it, so protocols pay the agent's vault, not a contract every agent shares. Only the agent's current registry owner can move vault assets (`ownerCall`); the vault and the firewall can never be targets. Executors can be **session keys** with an expiry (`ExecutorExpired` after `validUntil`), and `createFirewallWithPermissions` does firewall + vault + session key + every permission + the key's gas stipend in **one transaction**. `AgentAction` and the execution id are byte-identical to V1, so proofs are unchanged; the full V1 firewall suite passes against V3. EIP-7702 delegation to a policy module is the next step for agents that want assets in their own address; the one-click demo already uses EIP-5792 batching, which 7702 wallets provide.
+
+**One-click demo.** `/demo` → **Run one-click demo**: connect once, confirm once (EIP-5792 `wallet_sendCalls` atomic batch where supported; otherwise the same calls are queued back to back with no clicks between), then a browser session key, which is the agent's executor, runs the deposit with no wallet prompt, and AgentTrace verifies the receipt, checks the outcome, anchors, shows `withdraw` blocked (simulated, nothing sent), and returns leftover gas.
+
+Status: `AgentFirewallV3`, `AgentVault` and `AgentProofQuorum` are tested in a local EVM (`npm run test:contracts`) and **not deployed yet**; deploy with `npm run deploy:v3:testnet -- --smoke` / `npm run deploy:v3:mainnet` and point the app's `AGENT_FIREWALL_ADDRESS` / `AGENT_PROOF_ADDRESS` at them. The one-click demo works today on the deployed V1 contracts.
 
 ## SDK: `traceCall`
 
@@ -349,6 +366,7 @@ What you **trust AgentTrace** for:
 - The **verifier wallet** (`0x77a5…0D85`) decides which proof hashes get anchored and what is posted to ERC-8004. Its checks are deterministic and reproducible from public data (the proof hash is a fixed ABI encoding of receipt fields), so anyone can recompute and dispute a verdict, but the contract does not re-verify the receipt itself.
 - **Outcome verdicts** are off-chain judgments over receipt logs (or Demo Protocol state), published as reputation feedback.
 - The `AgentProof` **owner** can change the verifier with `setVerifier`.
+- With [`AgentProofQuorum`](contracts/AgentProofQuorum.sol) (written and tested, not yet deployed) the single verifier becomes a k-of-n set with onchain conflicts, public challenges and revocation; see [Trust upgrades](#trust-upgrades-verifier-quorum-per-agent-vaults-one-click-setup).
 
 What AgentTrace does **not** claim: that an allowed call was a good idea (a malicious executor can still do anything the owner allowed), or that agents are "safe" or "trustless". Keys: the verifier and deployer keys are server-side environment variables only, never `VITE_` variables, never committed. API keys are SHA-256 hashed; webhooks are HMAC-SHA256 signed. Full write-up: [docs/security.md](docs/security.md).
 
@@ -356,10 +374,10 @@ What AgentTrace does **not** claim: that an allowed call was a good idea (a mali
 
 Stated plainly:
 
-- **Single verifier.** One AgentTrace-run wallet anchors proofs and posts ERC-8004 verdicts. There is no multi-verifier quorum, staking, or slashing yet.
+- **Single verifier on the live deployments.** One AgentTrace-run wallet anchors proofs and posts ERC-8004 verdicts today. `AgentProofQuorum` (k-of-n verifiers, conflicts, public challenges, revocation) and an independent `second-verifier.mjs` are written and tested but not deployed yet. No staking, slashing or challenger bonds.
 - **Outcome checks are narrow.** Arbitrary contracts support `EVENT_EMITTED` only. Balance/value/state checks work only for the bundled Demo Protocol. Anything else is `unverifiable`.
 - **One real protocol so far.** Agent #003 calls canonical WMON on mainnet. The other live examples use `DemoProtocol`, an accounting-only contract with no custody. Built-in outcome adapters exist only for WMON `deposit`/`transfer` and the Demo Protocol.
-- **Shared custody in the firewall.** Calls run with `msg.sender` = the single `AgentFirewall` contract, so tokens a protocol sends to the caller sit in that shared contract, and any firewall that allows `transfer` on that token could move them. Use protocols that pay an explicit recipient, or return the tokens in the next call, as agent #003 does. A per-agent vault is on the roadmap.
+- **Shared custody in the deployed V1 firewall.** On the live V1 `AgentFirewall`, calls run with `msg.sender` = the single firewall contract, so tokens a protocol sends to the caller sit in that shared contract, and any firewall that allows `transfer` on that token could move them. Use protocols that pay an explicit recipient, or return the tokens in the next call, as agent #003 does. `AgentFirewallV3` fixes this with a per-agent `AgentVault` and session keys; it is tested but not deployed yet.
 - **Small live footprint.** Three active agents on mainnet: #001 (ERC-8004 #10280), Treasury Agent #002 (MCP; not ERC-8004 linked), and WMON Agent #003 (ERC-8004 #10315; owner and executor are the same wallet). On testnet, earlier test agents were deactivated; agent #006 is the showcase, and agent #012 ("ArgCap Agent") uses an `AgentFirewallV2` firewall that the app does not index yet.
 - **No server-side executor.** The API evaluates policy but does not send firewall transactions; the agent (or SDK) signs.
 - **Hosted apps run wallet-only.** API keys and webhooks need an account database, which the hosted deployments do not run; the developer API client is testnet/self-hosted only.
@@ -485,8 +503,8 @@ Everything below is public; no wallet needed.
 5. Read the [MCP transcript](docs/agent-runs/mcp-mainnet.md): an allowed deposit with a verified, anchored proof and a blocked withdraw with nothing sent.
 6. Open [firewall #001](https://agenttrace-mainnet.vercel.app/firewalls/1): readable policy and execution history.
 7. Optional: `npm ci && node scripts/verify-proof.mjs 0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e` to recompute that proof hash from public RPC and compare it with the onchain anchor (prints `PASS`).
-8. Optional: `npm run test:contracts` to see the firewall rules, including V2 argument caps, enforced in a local EVM.
-9. Optional, with a wallet and a little testnet MON: run `/demo` on [testnet](https://agenttrace-plum.vercel.app/demo) end to end.
+8. Optional: `npm run test:contracts` to see the firewall rules, including V2 argument caps, V3 per-agent vaults and session keys, and the multi-verifier quorum, enforced in a local EVM.
+9. Optional, with a wallet and a little testnet MON: run `/demo` on [testnet](https://agenttrace-plum.vercel.app/demo) and press **Run one-click demo**: one connection, one confirmation (with an EIP-5792 wallet), and the rest verifies itself.
 
 ## Demo video and screenshots
 
@@ -515,9 +533,10 @@ From the live mainnet app, captured with `node scripts/readme-screenshots.mjs`:
 
 ## Roadmap
 
-- Multiple independent verifiers (quorum anchoring), so no single AgentTrace wallet decides a verdict
-- Onchain argument caps on mainnet (`AgentFirewallV2` is live on testnet)
-- A per-agent vault, so tokens a protocol pays to the caller are not held in the shared firewall contract
+- Deploy `AgentProofQuorum` with a second, independently operated verifier (contract and `second-verifier.mjs` are done)
+- Deploy `AgentFirewallV3` (per-agent vaults, session keys, one-transaction setup; also brings onchain argument caps to mainnet) and index it in the app
+- EIP-7702 policy module so an agent's own address can be the custody account
+- Verifier staking/slashing and challenger bonds on top of the quorum's challenge events
 - More built-in outcome adapters for Monad protocols (WMON is the first)
 - Publish `agenttrace-monad` to npm; packaged MCP server
 - A configured executor that can submit `execute` from the API without weakening firewall checks
@@ -525,7 +544,7 @@ From the live mainnet app, captured with `node scripts/readme-screenshots.mjs`:
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) · [Contracts](docs/contracts.md) · [API](docs/api.md) · [SDK](docs/sdk.md) · [Security](docs/security.md)
+- [Trust upgrades](docs/trust-upgrades.md) · [Architecture](docs/architecture.md) · [Contracts](docs/contracts.md) · [API](docs/api.md) · [SDK](docs/sdk.md) · [Security](docs/security.md)
 - [Submission notes](docs/submission.md) · [Demo script](docs/demo-script.md) · [Demo voiceover](docs/demo-voiceover.md) · [MCP mainnet run](docs/agent-runs/mcp-mainnet.md) · [WMON mainnet run](docs/agent-runs/wmon-mainnet.md)
 
 ## License

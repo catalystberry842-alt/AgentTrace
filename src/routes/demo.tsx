@@ -4,6 +4,7 @@ import { encodeFunctionData } from "viem";
 import {
   anchorProof,
   confirmFirewallTx,
+  confirmSetupTx,
   getChainStatus,
   readDemoState,
   refreshFirewallIntent,
@@ -46,9 +47,14 @@ type Saved = {
   outcomeStatus: string | null;
   observed: string | null;
   anchorTxHash?: string | null;
+  /** Set by the one-click path: the executor is this browser's session key, not the wallet. */
+  oneClick?: boolean;
+  setupTxHashes?: string[];
+  batched?: boolean;
+  vaultMode?: boolean;
 };
 
-type Failed = { step: string; detail: string; txHash: string | null; retry: "agent" | "firewall" | "permission" | "deposit" | "withdraw" };
+type Failed = { step: string; detail: string; txHash: string | null; retry: "agent" | "firewall" | "permission" | "deposit" | "withdraw" | "oneclick" };
 type Checks = {
   targetAllowed: boolean;
   depositAllowed: boolean;
@@ -178,6 +184,100 @@ function DemoPage() {
     setFailed(null);
     setBlocked(null);
     setChecks(null);
+  }
+
+  /**
+   * One click: connect once, confirm the setup once (EIP-5792 batch when the wallet supports it),
+   * then the agent's session key acts and AgentTrace verifies everything by itself.
+   */
+  async function runOneClick() {
+    if (!configured) return;
+    setBusy(true);
+    setFailed(null);
+    setBlocked(null);
+    setPhase("Connecting wallet");
+    let stage = "Setup";
+    try {
+      const { getSigner } = await import("@/lib/chain/wallet");
+      const oc = await import("@/lib/chain/one-click");
+      const signer = await getSigner();
+      const owner = (await signer.getAddress()).toLowerCase() as `0x${string}`;
+      const status = await getChainStatus();
+      if (!status.registry || !status.firewall || !status.demoProtocol) {
+        throw new Error("Agent Registry, Agent Firewall or Demo Protocol is not deployed. No transaction was sent.");
+      }
+      const registry = status.registry as `0x${string}`;
+      const firewall = status.firewall as `0x${string}`;
+      const demo = status.demoProtocol as `0x${string}`;
+      const key = oc.loadSessionKey();
+      const executor = oc.sessionAccount(key).address.toLowerCase() as `0x${string}`;
+      // A run that stopped after setup resumes with the same agent, firewall and session key.
+      const resume =
+        saved.oneClick && saved.agentId && saved.firewallId && saved.executor === executor
+          ? { agentId: BigInt(saved.agentId), firewallId: BigInt(saved.firewallId), txHashes: [] as `0x${string}`[], batched: Boolean(saved.batched), v3: Boolean(saved.vaultMode) }
+          : null;
+      const setup = resume ?? await oc.runSetup(
+        {
+          registry,
+          firewall,
+          target: demo,
+          targetName: "AgentTrace Demo Protocol",
+          selectors: [oc.DEPOSIT_SELECTOR],
+          agent: AGENT,
+          owner,
+          executor,
+        },
+        (call) => signer.signTransaction({ to: call.to, data: call.data, value: call.value }),
+        setPhase,
+      );
+      setPhase("Setup confirmed. AgentTrace is indexing it...");
+      for (const txHash of setup.txHashes) {
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          const indexed = await confirmSetupTx({ data: { txHash } });
+          if (indexed.state === "indexed") break;
+          await sleep(1500);
+        }
+      }
+      const agentId = setup.agentId.toString();
+      const firewallId = setup.firewallId.toString();
+      setSaved((current) => ({
+        ...current,
+        agentId,
+        firewallId,
+        executor,
+        oneClick: true,
+        setupTxHashes: resume ? current.setupTxHashes : setup.txHashes,
+        batched: setup.batched,
+        vaultMode: setup.v3,
+        txHash: resume ? current.txHash : (setup.txHashes[setup.txHashes.length - 1] ?? null),
+      }));
+      stage = "Agent action";
+      setPhase("The agent acts with its own session key (no wallet prompt)...");
+      const hash = await oc.sessionExecute(key, firewall, setup.firewallId, demo, oc.depositCalldata(setup.agentId, 100n));
+      await settleDeposit(hash, firewallId);
+      stage = "Blocked action";
+      const reason = await oc.sessionSimulate(key, firewall, setup.firewallId, demo, oc.withdrawCalldata(setup.agentId, 100n));
+      if (reason) setBlocked(`${reason}: the firewall rejects withdraw for this agent. Simulated only, nothing was sent.`);
+      // Give back what is left of the session key's gas. Monad lets an account empty itself only
+      // a few blocks after its last transaction, so wait a moment first.
+      window.setTimeout(() => {
+        oc.returnSessionGas(key, owner)
+          .then((sent) => {
+            if (sent) oc.forgetSessionKey();
+          })
+          .catch(() => undefined);
+      }, 4000);
+    } catch (err) {
+      setFailed({
+        step: stage,
+        detail: err instanceof Error ? err.message : "The demo stopped.",
+        txHash: null,
+        retry: "oneclick",
+      });
+      setPhase(null);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function createAgent() {
@@ -347,6 +447,78 @@ function DemoPage() {
     }
   }
 
+  /**
+   * After an execute transaction: index it, verify the receipt (14 checks), check the outcome,
+   * anchor. Shared by the step-by-step and one-click paths.
+   */
+  async function settleDeposit(hash: `0x${string}`, firewallId: string) {
+    setSaved((current) => ({ ...current, txHash: hash }));
+    setPhase("Waiting for confirmation");
+    let indexed = false;
+    let executionId: string | null = null;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const result = await confirmFirewallTx({ data: { txHash: hash, firewallId } });
+      if (result.state === "indexed") {
+        indexed = true;
+        executionId = result.executionIds[0] ?? null;
+        break;
+      }
+      if (result.state === "reverted" || result.state === "empty") {
+        throw new Error("error" in result ? result.error : "The transaction did not create an agent action.");
+      }
+      setPhase("Waiting for confirmation");
+      await sleep(2000);
+    }
+    if (!indexed) throw new Error("The transaction is confirmed or still pending. Indexing did not finish. Nothing was marked verified.");
+    setPhase("Indexing action");
+    if (!executionId) throw new Error("The transaction confirmed but it did not emit an AgentAction.");
+    const action = { executionId, txHash: hash };
+    setSaved((current) => ({ ...current, executionId: action.executionId, txHash: hash }));
+    setPhase("Verifying execution");
+    let proof = await verifyProof({ data: action });
+    for (
+      let attempt = 0;
+      attempt < 4 &&
+      (proof.proof.verificationStatus === "temporary_error" ||
+        proof.proof.verificationStatus === "executed" ||
+        proof.proof.verificationStatus === "requested");
+      attempt += 1
+    ) {
+      setPhase("Execution detected. Verifying transaction evidence...");
+      await sleep(2000);
+      proof = await verifyProof({ data: action });
+    }
+    setSaved((current) => ({ ...current, proofStatus: proof.proof.verificationStatus }));
+    if (proof.proof.verificationStatus !== "receipt_verified") {
+      throw new Error(
+        proof.proof.lastError
+          ? `Execution detected, but verification failed. ${proof.proof.lastError}`
+          : "Execution detected, but verification failed.",
+      );
+    }
+    setPhase("Proof created");
+    setPhase("Checking outcome...");
+    const outcome = await verifyDemoDeposit({ data: action });
+    setSaved((current) => ({
+      ...current,
+      outcomeStatus: outcome.status,
+      observed: outcome.observed,
+    }));
+    if (outcome.status !== "verified") {
+      setPhase(outcome.status === "unverifiable" ? "Outcome unavailable" : "Outcome verification failed");
+      throw new Error(outcome.reason || "The outcome was not verified.");
+    }
+    setPhase("Outcome verified. Anchoring proof onchain...");
+    // Anchoring is a server-side verifier transaction. It never undoes a verified outcome.
+    try {
+      const anchored = await anchorProof({ data: action });
+      setSaved((current) => ({ ...current, anchorTxHash: anchored.anchored ? anchored.txHash ?? "anchored" : null }));
+      setPhase(anchored.anchored ? "Outcome verified. Proof anchored onchain." : "Outcome verified");
+    } catch {
+      setPhase("Outcome verified");
+    }
+  }
+
   async function runDeposit() {
     if (!saved.agentId || !saved.firewallId || !firewallAddress || !demoAddress || !permissionReady) return;
     setBusy(true);
@@ -361,76 +533,17 @@ function DemoPage() {
         functionName: "deposit",
         args: [BigInt(saved.agentId), 100n],
       });
-      hash = await sendFirewallTransaction({
-        to: firewallAddress as `0x${string}`,
-        functionName: "execute",
-        args: [BigInt(saved.firewallId), demoAddress as `0x${string}`, 0n, data],
-      });
-      setSaved((current) => ({ ...current, txHash: hash }));
-      setPhase("Waiting for confirmation");
-      let indexed = false;
-      let executionId: string | null = null;
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        const result = await confirmFirewallTx({ data: { txHash: hash, firewallId: saved.firewallId } });
-        if (result.state === "indexed") {
-          indexed = true;
-          executionId = result.executionIds[0] ?? null;
-          break;
-        }
-        if (result.state === "reverted" || result.state === "empty") {
-          throw new Error("error" in result ? result.error : "The transaction did not create an agent action.");
-        }
-        setPhase("Waiting for confirmation");
-        await sleep(2000);
+      if (saved.oneClick) {
+        const oc = await import("@/lib/chain/one-click");
+        hash = await oc.sessionExecute(oc.loadSessionKey(), firewallAddress as `0x${string}`, BigInt(saved.firewallId), demoAddress as `0x${string}`, data);
+      } else {
+        hash = await sendFirewallTransaction({
+          to: firewallAddress as `0x${string}`,
+          functionName: "execute",
+          args: [BigInt(saved.firewallId), demoAddress as `0x${string}`, 0n, data],
+        });
       }
-      if (!indexed) throw new Error("The transaction is confirmed or still pending. Indexing did not finish. Nothing was marked verified.");
-      setPhase("Indexing action");
-      if (!executionId) throw new Error("The transaction confirmed but it did not emit an AgentAction.");
-      const action = { executionId, txHash: hash };
-      setSaved((current) => ({ ...current, executionId: action.executionId, txHash: hash }));
-      setPhase("Verifying execution");
-      let proof = await verifyProof({ data: action });
-      for (
-        let attempt = 0;
-        attempt < 4 &&
-        (proof.proof.verificationStatus === "temporary_error" ||
-          proof.proof.verificationStatus === "executed" ||
-          proof.proof.verificationStatus === "requested");
-        attempt += 1
-      ) {
-        setPhase("Execution detected. Verifying transaction evidence...");
-        await sleep(2000);
-        proof = await verifyProof({ data: action });
-      }
-      setSaved((current) => ({ ...current, proofStatus: proof.proof.verificationStatus }));
-      if (proof.proof.verificationStatus !== "receipt_verified") {
-        throw new Error(
-          proof.proof.lastError
-            ? `Execution detected, but verification failed. ${proof.proof.lastError}`
-            : "Execution detected, but verification failed.",
-        );
-      }
-      setPhase("Proof created");
-      setPhase("Checking outcome...");
-      const outcome = await verifyDemoDeposit({ data: action });
-      setSaved((current) => ({
-        ...current,
-        outcomeStatus: outcome.status,
-        observed: outcome.observed,
-      }));
-      if (outcome.status !== "verified") {
-        setPhase(outcome.status === "unverifiable" ? "Outcome unavailable" : "Outcome verification failed");
-        throw new Error(outcome.reason || "The outcome was not verified.");
-      }
-      setPhase("Outcome verified. Anchoring proof onchain...");
-      // Anchoring is a server-side verifier transaction. It never undoes a verified outcome.
-      try {
-        const anchored = await anchorProof({ data: action });
-        setSaved((current) => ({ ...current, anchorTxHash: anchored.anchored ? anchored.txHash ?? "anchored" : null }));
-        setPhase(anchored.anchored ? "Outcome verified. Proof anchored onchain." : "Outcome verified");
-      } catch {
-        setPhase("Outcome verified");
-      }
+      await settleDeposit(hash, saved.firewallId);
     } catch (err) {
       setFailed({
         step: "Run deposit",
@@ -465,6 +578,13 @@ function DemoPage() {
         functionName: "withdraw",
         args: [BigInt(saved.agentId), 100n],
       });
+      if (saved.oneClick) {
+        const oc = await import("@/lib/chain/one-click");
+        const reason = await oc.sessionSimulate(oc.loadSessionKey(), firewallAddress as `0x${string}`, BigInt(saved.firewallId), demoAddress as `0x${string}`, data);
+        if (reason) setBlocked(`${reason}: the firewall rejects withdraw for this agent. Simulated only, nothing was sent.`);
+        else setFailed({ step: "Blocked action", detail: "The firewall would accept withdraw. A blocked result is not shown.", txHash: null, retry: "withdraw" });
+        return;
+      }
       const hash = await sendFirewallTransaction({
         to: firewallAddress as `0x${string}`,
         functionName: "execute",
@@ -549,6 +669,34 @@ function DemoPage() {
 
       {configured && user ? (
         <div className="mt-10 max-w-xl space-y-8">
+          <section className="rounded-sm border border-border p-5">
+            <h2 className="text-sm font-medium">Run the whole demo in one click</h2>
+            <p className="mt-2 text-sm text-muted">
+              Connect once and confirm the setup once. Your wallet registers the agent and fences it (firewall, target,
+              deposit only) and funds a fresh session key with a little gas. The session key is the agent: it runs the
+              deposit without another wallet prompt, then AgentTrace verifies the receipt, checks the outcome, anchors the
+              proof, and shows that withdraw is blocked. Leftover gas is sent back to you.
+            </p>
+            <p className="mt-2 text-xs text-faint">
+              Wallets with EIP-5792 batching (wallet_sendCalls) confirm every setup step in one request. Other wallets get
+              the same steps queued back to back, with no clicks in between.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button type="button" disabled={busy || saved.outcomeStatus === "verified"} onClick={() => void runOneClick()}>
+                {saved.outcomeStatus === "verified" ? "Demo complete" : "Run one-click demo"}
+              </Button>
+              {saved.oneClick && saved.setupTxHashes?.length ? (
+                <span className="text-xs text-muted">
+                  Setup: {saved.setupTxHashes.length} transaction{saved.setupTxHashes.length === 1 ? "" : "s"}
+                  {saved.batched ? ", one wallet confirmation" : ""}
+                  {saved.vaultMode ? ", per-agent vault" : ""}
+                </span>
+              ) : null}
+            </div>
+            {busy && phase ? <p className="mt-3 text-sm">{phase}</p> : null}
+            <p className="mt-4 text-xs text-faint">Or go step by step below.</p>
+          </section>
+
           <section>
             <h2 className="text-sm font-medium">Agent</h2>
             {saved.agentId ? (
@@ -719,6 +867,7 @@ function DemoPage() {
                     if (failed.retry === "permission") void configurePermission();
                     if (failed.retry === "deposit") void runDeposit();
                     if (failed.retry === "withdraw") void runWithdraw();
+                    if (failed.retry === "oneclick") void runOneClick();
                   }}
                 >
                   Retry

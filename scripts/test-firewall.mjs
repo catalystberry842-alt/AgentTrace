@@ -19,8 +19,8 @@ import {
 
 const root = join(import.meta.dirname, "..");
 const registryArtifact = JSON.parse(readFileSync(join(root, "contracts/out/AgentRegistry.json"), "utf8"));
-// FIREWALL_VARIANT=V2 runs the same suite against AgentFirewallV2 to prove V1 behaviour is unchanged.
-const variant = process.env.FIREWALL_VARIANT === "V2" ? "AgentFirewallV2" : "AgentFirewall";
+// FIREWALL_VARIANT=V2 or V3 runs the same suite against AgentFirewallV2/V3 to prove V1 behaviour is unchanged.
+const variant = { V2: "AgentFirewallV2", V3: "AgentFirewallV3" }[process.env.FIREWALL_VARIANT] ?? "AgentFirewall";
 const firewallArtifact = JSON.parse(readFileSync(join(root, `contracts/out/${variant}.json`), "utf8"));
 const registryAbi = registryArtifact.abi;
 const firewallAbi = firewallArtifact.abi;

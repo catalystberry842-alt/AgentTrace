@@ -3,7 +3,10 @@
 // It does not call the AgentTrace API or database.
 //
 //   node scripts/verify-proof.mjs <executionId|txHash> [--chain mainnet|testnet] [--rpc URL]
+//                                 [--firewall 0x..] [--proof 0x..]
 //
+// --firewall / --proof point the check at another deployment (for example AgentFirewallV3 and
+// AgentProofQuorum, which keep the same AgentAction and ExecutionProofAnchored events).
 // txHash may be the firewall execution transaction or the AgentProof anchor transaction.
 // Steps: fetch receipt -> decode AgentAction from AgentFirewall -> check calldataHash
 // against the execute() input -> rebuild the proof hash per docs/contracts.md ->
@@ -19,7 +22,7 @@ import {
   parseAbi,
 } from "viem";
 
-const ADDR = {
+const DEFAULT_ADDR = {
   firewall: "0x694178a2396b54bff6a25caa0aa9cca6eb079441",
   proof: "0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e",
 };
@@ -54,13 +57,15 @@ export function computeProofHash(f) {
 }
 
 function parseArgs(argv) {
-  const out = { chain: "mainnet", rpc: undefined, id: undefined };
+  const out = { chain: "mainnet", rpc: undefined, id: undefined, firewall: undefined, proof: undefined };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--chain") out.chain = argv[++i];
     else if (a.startsWith("--chain=")) out.chain = a.slice(8);
     else if (a === "--rpc") out.rpc = argv[++i];
     else if (a.startsWith("--rpc=")) out.rpc = a.slice(6);
+    else if (a === "--firewall") out.firewall = argv[++i];
+    else if (a === "--proof") out.proof = argv[++i];
     else if (!out.id) out.id = a;
   }
   return out;
@@ -80,7 +85,11 @@ function decodeLogs(receipt, address, abi, eventName) {
   return rows;
 }
 
-export async function verifyProof({ id, chain = "mainnet", rpc, log = console.log }) {
+export async function verifyProof({ id, chain = "mainnet", rpc, log = console.log, firewall, proof, requireAnchor = true }) {
+  const ADDR = {
+    firewall: (firewall ?? DEFAULT_ADDR.firewall).toLowerCase(),
+    proof: (proof ?? DEFAULT_ADDR.proof).toLowerCase(),
+  };
   const net = CHAINS[chain];
   if (!net) throw new Error(`unknown chain ${chain}`);
   if (!/^0x[0-9a-fA-F]{64}$/.test(id ?? "")) throw new Error("expected a 32-byte 0x hex executionId or txHash");
@@ -105,7 +114,11 @@ export async function verifyProof({ id, chain = "mainnet", rpc, log = console.lo
   log(`executionId ${executionId}`);
 
   const anchored = await client.readContract({ address: ADDR.proof, abi: proofAbi, functionName: "isAnchored", args: [executionId] });
-  check("AgentProof.isAnchored", anchored === true, anchored ? "" : "(not anchored: the hash is rebuilt below but there is nothing onchain to compare)");
+  if (requireAnchor || anchored) {
+    check("AgentProof.isAnchored", anchored === true, anchored ? "" : "(not anchored: the hash is rebuilt below but there is nothing onchain to compare)");
+  } else {
+    log("not anchored yet: rebuilding the proof hash from the receipt only");
+  }
   if (!anchored && !execTxHash) return { pass: false, checks };
   const anchor = anchored
     ? await client.readContract({ address: ADDR.proof, abi: proofAbi, functionName: "getAnchor", args: [executionId] })

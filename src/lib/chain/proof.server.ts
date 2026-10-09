@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, decodeEventLog, type Hex, type Log } from "viem";
+import { createPublicClient, createWalletClient, decodeEventLog, parseAbiItem, type Hex, type Log } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { defineChain } from "viem";
 import { getSql, type Sql } from "@/lib/db";
@@ -708,6 +708,16 @@ export async function anchorVerifiedProof(
     }
     const next = await getExecutionProof(proof.executionId);
     if (!next?.anchored) {
+      // AgentProofQuorum: this verifier's attestation counted, but the threshold is not met yet.
+      const attested = quorumAttestation(receipt.logs, contract);
+      if (attested) {
+        return {
+          anchored: false,
+          reason: `Attested by this verifier (${attested.count} of ${attested.threshold}). The proof is anchored when the other independent verifiers attest the same hash.`,
+          txHash: hash,
+          proof: next,
+        };
+      }
       return {
         anchored: false,
         reason: "The transaction confirmed but the proof hash was not anchored for this execution.",
@@ -727,6 +737,23 @@ export async function anchorVerifiedProof(
     }
     return { anchored: false, reason: message, txHash: null, proof };
   }
+}
+
+const proofAttestedEvent = parseAbiItem(
+  "event ProofAttested(bytes32 indexed executionId, bytes32 indexed proofHash, address indexed verifier, uint32 attestations, uint256 threshold, uint64 at)",
+);
+
+function quorumAttestation(logs: readonly { address: string; topics: Hex[]; data: Hex }[], contract: string) {
+  for (const log of logs) {
+    if (log.address.toLowerCase() !== contract.toLowerCase() || log.topics.length === 0) continue;
+    try {
+      const decoded = decodeEventLog({ abi: [proofAttestedEvent], data: log.data, topics: log.topics as [Hex, ...Hex[]] });
+      return { count: Number(decoded.args.attestations), threshold: Number(decoded.args.threshold) };
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 export async function applyProofLog(log: { address?: string; topics: Hex[]; data: Hex; blockNumber?: bigint | null; transactionHash?: Hex | null }): Promise<void> {

@@ -836,6 +836,32 @@ export const confirmFirewallTx = createServerFn({ method: "POST" })
     return outcome;
   });
 
+/**
+ * Index a setup transaction by its receipt logs. A batched (EIP-5792) setup is sent from the
+ * owner's account, not to the registry or firewall, so the call data cannot be decoded; the
+ * AgentRegistered and FirewallCreated events the contracts emitted are the evidence instead.
+ */
+export const confirmSetupTx = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { txHash?: string }) => {
+    if (!input || typeof input.txHash !== "string" || !/^0x[a-fA-F0-9]{64}$/.test(input.txHash)) {
+      throw new Error("Invalid transaction hash.");
+    }
+    return { txHash: input.txHash as `0x${string}` };
+  })
+  .handler(async ({ data }) => {
+    const sql = await getSql();
+    const registration = await confirmRegistrationReceipt(sql, data.txHash);
+    if (registration.state === "pending") return { state: "pending" as const, agentId: null, owner: null, firewallIds: [] as string[] };
+    const firewall = await ingestFirewallReceipt(sql, data.txHash);
+    return {
+      state: "indexed" as const,
+      agentId: registration.state === "registered" ? registration.agentId : null,
+      owner: registration.state === "registered" ? registration.owner : null,
+      firewallIds: firewall.state === "indexed" ? firewall.firewallIds : ([] as string[]),
+    };
+  });
+
 export const readDemoState = createServerFn({ method: "GET" })
   .validator((firewallId: string) => (firewallId && !/^[1-9]\d*$/.test(firewallId) ? "" : firewallId))
   .handler(async ({ data }) => readDemoFirewall(data));
