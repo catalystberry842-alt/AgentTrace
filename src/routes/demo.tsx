@@ -221,6 +221,10 @@ function DemoPage() {
         !fresh && saved.oneClick && saved.agentId && saved.firewallId && saved.executor === executor
           ? { agentId: BigInt(saved.agentId), firewallId: BigInt(saved.firewallId), txHashes: [] as `0x${string}`[], batched: Boolean(saved.batched), v3: Boolean(saved.vaultMode) }
           : null;
+      if (!resume) {
+        setPhase("Checking your wallet balance");
+        await oc.ensureSetupFunds(owner);
+      }
       const setup = resume ?? await oc.runSetup(
         {
           registry,

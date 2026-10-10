@@ -39,7 +39,11 @@ function errorCode(err: unknown): number | null {
 
 function walletError(err: unknown): Error {
   if (errorCode(err) === 4001) return new Error("The wallet request was rejected.");
-  if (err instanceof Error && err.message) return err;
+  const message = err instanceof Error ? err.message : "";
+  if (/insufficient funds|exceeds balance|gas required exceeds/i.test(message)) {
+    return new Error(`The wallet does not have enough ${MONAD_TESTNET.nativeSymbol} on ${MONAD_TESTNET.label} for this transaction's gas. No transaction was sent.`);
+  }
+  if (message) return err as Error;
   return new Error("The wallet could not submit the transaction.");
 }
 
@@ -108,6 +112,14 @@ export async function getSigner(): Promise<ChainSigner> {
   return {
     getAddress: async () => address,
     signTransaction: async (tx) => {
+      // An empty wallet otherwise surfaces RPC noise ("Missing or invalid parameters").
+      const balance = await eth.request({ method: "eth_getBalance", params: [address, "latest"] }).catch(() => null);
+      if (typeof balance === "string" && BigInt(balance) === 0n) {
+        throw new Error(
+          `This wallet has no ${MONAD_TESTNET.nativeSymbol} on ${MONAD_TESTNET.label} to pay gas. No transaction was sent.` +
+            (MONAD_TESTNET.key === "testnet" ? " Get free test MON at https://faucet.monad.xyz." : ""),
+        );
+      }
       const request: Record<string, string> = {
         from: address,
         to: tx.to,

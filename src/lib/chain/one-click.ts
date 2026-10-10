@@ -206,6 +206,24 @@ export async function isFirewallV3(firewall: `0x${string}`): Promise<boolean> {
   }
 }
 
+/**
+ * Fail early, in plain words, when the wallet cannot pay for the setup. Without this a wallet
+ * with no MON surfaces an RPC error such as "Missing or invalid parameters".
+ * Budget: the session key's stipend plus up to five setup transactions at about 300k gas each
+ * (Monad charges the gas limit).
+ */
+export async function ensureSetupFunds(owner: `0x${string}`): Promise<void> {
+  const client = readClient();
+  const [balance, price] = await Promise.all([client.getBalance({ address: owner }), client.getGasPrice()]);
+  const needed = price * (SESSION_GAS_UNITS + 5n * 300_000n);
+  if (balance >= needed) return;
+  const fmt = (wei: bigint) => (Number(wei / 10n ** 12n) / 1e6).toFixed(4);
+  const faucet = MONAD.key === "testnet" ? " Get free test MON at https://faucet.monad.xyz, then press Retry." : "";
+  throw new Error(
+    `Your wallet has ${fmt(balance)} ${MONAD.nativeSymbol} on ${MONAD.label}; the demo needs about ${fmt(needed)} ${MONAD.nativeSymbol} for gas. No transaction was sent.${faucet}`,
+  );
+}
+
 export async function sessionStipend(): Promise<bigint> {
   const price = await readClient().getGasPrice();
   return price * SESSION_GAS_UNITS;
