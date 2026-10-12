@@ -4,6 +4,7 @@ import { agentFirewallAbi, agentRegistryAbi } from "@/lib/chain/abi";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { encodeCapabilities } from "@/lib/agents/capabilities";
 import { injectedProvider, noWalletMessage, waitForProvider } from "@/lib/chain/injected";
+import { markConnected, setWalletChain } from "@/lib/chain/wallet-store";
 
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -74,6 +75,7 @@ async function ensureMonad(eth: EthereumProvider): Promise<void> {
   if (typeof after !== "string" || after.toLowerCase() !== MONAD_TESTNET.chainIdHex) {
     throw new Error(`Wallet is not on ${MONAD_TESTNET.label}.`);
   }
+  setWalletChain(after);
 }
 
 /**
@@ -95,6 +97,12 @@ async function waitForInclusion(eth: EthereumProvider, hash: `0x${string}`, time
   }
 }
 
+/** Connect the browser wallet once for the whole app and switch it to Monad (adding the chain if needed). */
+export async function connectWallet(): Promise<`0x${string}`> {
+  const signer = await getSigner();
+  return signer.getAddress();
+}
+
 export async function getSigner(): Promise<ChainSigner> {
   const eth = (await waitForProvider()) ?? provider();
   let accounts: unknown;
@@ -108,6 +116,7 @@ export async function getSigner(): Promise<ChainSigner> {
     throw new Error("Wallet did not return an account.");
   }
   const address = from as `0x${string}`;
+  markConnected(address);
   await ensureMonad(eth);
   return {
     getAddress: async () => address,

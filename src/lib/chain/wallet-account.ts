@@ -1,86 +1,37 @@
-import { useCallback, useEffect, useState } from "react";
-import { injectedProvider, noWalletMessage, waitForProvider, type InjectedProvider } from "@/lib/chain/injected";
-
-function injected(): InjectedProvider | null {
-  return injectedProvider();
-}
-
-function firstAccount(value: unknown): `0x${string}` | null {
-  const first = Array.isArray(value) ? value[0] : null;
-  return typeof first === "string" && /^0x[a-fA-F0-9]{40}$/.test(first)
-    ? (first.toLowerCase() as `0x${string}`)
-    : null;
-}
+import { useCallback, useSyncExternalStore } from "react";
+import { getServerWalletState, getWalletState, subscribeWallet, disconnectWallet, setWalletConnecting } from "@/lib/chain/wallet-store";
+import { MONAD_TESTNET } from "@/lib/chain/network";
 
 /**
- * The connected browser wallet address, read without a prompt (`eth_accounts`).
- * In wallet-only deployments this is the identity: agents are listed by their onchain owner.
+ * The app-wide wallet connection (see wallet-store). Connecting here, from the header or any
+ * page, switches the wallet to Monad and unlocks every write action; nothing else signs in.
  */
 export function useWalletAccount(): {
   address: `0x${string}` | null;
+  chainId: string | null;
+  onMonad: boolean;
   ready: boolean;
   available: boolean;
+  connecting: boolean;
   connect: () => Promise<void>;
+  disconnect: () => void;
   error: string | null;
 } {
-  const [address, setAddress] = useState<`0x${string}` | null>(null);
-  const [ready, setReady] = useState(false);
-  const [available, setAvailable] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const eth = injected();
-    if (!eth) {
-      // Wallets that only announce via EIP-6963 can answer a moment after load.
-      void waitForProvider().then((late) => {
-        if (cancelled) return;
-        setAvailable(Boolean(late));
-        setReady(true);
-        if (!late) return;
-        late
-          .request({ method: "eth_accounts" })
-          .then((accounts) => {
-            if (!cancelled) setAddress(firstAccount(accounts));
-          })
-          .catch(() => undefined);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-    setAvailable(true);
-    eth
-      .request({ method: "eth_accounts" })
-      .then((accounts) => {
-        if (!cancelled) setAddress(firstAccount(accounts));
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) setReady(true);
-      });
-    const onChange = (accounts: unknown) => setAddress(firstAccount(accounts));
-    eth.on?.("accountsChanged", onChange);
-    return () => {
-      cancelled = true;
-      eth.removeListener?.("accountsChanged", onChange);
-    };
-  }, []);
-
+  const state = useSyncExternalStore(subscribeWallet, getWalletState, getServerWalletState);
   const connect = useCallback(async () => {
-    const eth = injected() ?? (await waitForProvider());
-    if (!eth) {
-      setError(noWalletMessage());
-      return;
-    }
-    setAvailable(true);
-    setError(null);
+    setWalletConnecting(true);
     try {
-      setAddress(firstAccount(await eth.request({ method: "eth_requestAccounts" })));
+      const { connectWallet } = await import("@/lib/chain/wallet");
+      await connectWallet();
+      setWalletConnecting(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The wallet did not connect.");
+      setWalletConnecting(false, err instanceof Error ? err.message : "The wallet did not connect.");
     }
   }, []);
-
-  return { address, ready, available, connect, error };
+  return {
+    ...state,
+    onMonad: state.chainId === MONAD_TESTNET.chainIdHex,
+    connect,
+    disconnect: disconnectWallet,
+  };
 }
