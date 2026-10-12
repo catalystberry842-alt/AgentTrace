@@ -4,7 +4,7 @@ import { listProofs } from "@/lib/agents/functions";
 import type { ProofRecord } from "@/lib/agents/types";
 import { Shell } from "@/components/shell";
 import { EmptyState, ErrorNote, Mono, StatusText, TableSkeleton, TextInput, buttonClass } from "@/components/ui";
-import { formatAgentId, formatUtc, proofStatusLabel } from "@/lib/format";
+import { formatAgentId, formatUtc, functionName, proofStatusLabel } from "@/lib/format";
 
 export const Route = createFileRoute("/proofs/")({ component: ProofsPage });
 
@@ -53,23 +53,27 @@ function ProofsPage() {
         <p className="mt-2 max-w-xl text-sm text-muted">Verified evidence of agent executions.</p>
       </header>
       <div className="mt-8">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <TextInput
           value={query}
+          className="md:max-w-md"
           placeholder="Search agent, execution or transaction"
           onChange={(event) => setQuery(event.target.value)}
         />
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           {FILTERS.map((item) => (
             <button
               key={item}
               type="button"
               aria-pressed={filter === item}
               onClick={() => setFilter(item)}
-              className={`h-11 rounded-sm border px-3 text-sm ${filter === item ? "border-border-strong bg-subtle text-fg" : "border-border text-muted"}`}
+              className={`h-11 rounded-md border px-3 text-sm ${filter === item ? "border-accent/60 bg-subtle text-fg" : "border-border text-muted hover:text-fg"}`}
             >
               {item}
             </button>
           ))}
+        </div>
+        {proofs ? <span className="text-sm text-faint md:ml-auto">{visible.length} of {proofs.length}</span> : null}
         </div>
         {error ? (
           <div className="mt-6">
@@ -91,27 +95,27 @@ function ProofsPage() {
           />
         ) : null}
         {visible.length > 0 ? (
-          <div className="mt-6">
-            <div className="hidden grid-cols-5 gap-3 border-b border-border py-3 text-xs tracking-widest text-faint uppercase md:grid">
+          <div className="mt-6 md:rounded-lg md:border md:border-border">
+            <div className="hidden grid-cols-[1.3fr_1fr_1fr_1.3fr_1fr] gap-3 border-b border-border px-4 py-3 text-xs tracking-widest text-faint uppercase md:grid">
               <span>Agent</span>
               <span>Execution</span>
               <span>Action</span>
               <span>Status</span>
               <span>Timestamp</span>
             </div>
-            <ul className="divide-y divide-border border-y border-border md:border-t-0">
+            <ul className="divide-y divide-border border-y border-border md:border-0">
               {visible.map((proof) => (
                 <li key={proof.executionId}>
                   <Link
                     to="/proofs/$proofId"
                     params={{ proofId: proof.executionId }}
-                    className="grid gap-2 py-4 text-sm md:grid-cols-5 md:items-center md:gap-3"
+                    className="grid gap-2 py-4 text-sm hover:bg-surface md:grid-cols-[1.3fr_1fr_1fr_1.3fr_1fr] md:items-center md:gap-3 md:px-4"
                   >
                     <span>
                       {proof.agentName || "Agent"} <span className="text-muted">{formatAgentId(proof.agentId)}</span>
                     </span>
                     <Mono>{shortId(proof.executionId)}</Mono>
-                    <Mono>{proof.functionSelector}</Mono>
+                    <span className="type-technical text-muted">{functionName(proof.functionSelector) ?? proof.functionSelector}</span>
                     <StatusText tone={toneFor(proof)}>{proofStatusLabel(proof.verificationStatus, proof.anchored)}</StatusText>
                     <span className="text-muted">{formatUtc(proof.blockTimestamp ?? proof.createdAt)}</span>
                   </Link>

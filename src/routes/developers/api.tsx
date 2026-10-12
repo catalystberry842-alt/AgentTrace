@@ -26,10 +26,10 @@ const ROUTES = [
 
 function ApiPage() {
   return (
-    <Shell>
+    <Shell wide>
       <h1 className="text-2xl font-medium tracking-tight">API</h1>
       <p className="mt-3 max-w-xl text-sm text-muted">
-        REST under <Mono>/api/v1</Mono>. Send the key as a bearer token. Keys are not accepted in the query string. Errors use <Mono>error.code</Mono> and <Mono>error.message</Mono>.
+        REST under <Mono>/api/v1</Mono>. GET endpoints are public and need no key. Write endpoints take an API key as a bearer token and are only enabled on account deployments; on this wallet-only deployment, writes go through your wallet in the app or <Mono>traceCall</Mono> in the SDK. Errors use <Mono>error.code</Mono> and <Mono>error.message</Mono>.
       </p>
       <DeveloperNav current="/developers/api" />
       <ul className="mt-8 divide-y divide-border border-y border-border font-mono text-xs">
@@ -43,9 +43,6 @@ function ApiPage() {
         Writes that cannot be confirmed return status failed, null ids, and a null transaction hash. Rate limits answer with 429 and Retry-After.
       </p>
       <div className="mt-4 flex flex-col gap-1 sm:flex-row sm:gap-6">
-        <Link to="/developers/api-keys" className="inline-flex h-11 items-center text-sm hover:underline">
-          Create API key
-        </Link>
         <Link to="/developers/explorer" className="inline-flex h-11 items-center text-sm text-muted hover:text-fg">
           API explorer
         </Link>

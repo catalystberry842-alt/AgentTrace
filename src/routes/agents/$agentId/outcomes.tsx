@@ -116,10 +116,10 @@ function OutcomesPage() {
               <Link
                 to="/outcomes/$executionId"
                 params={{ executionId: item.executionId }}
-                className="grid gap-1 py-3 text-sm md:grid-cols-4 md:items-center"
+                className="grid gap-1 py-3 text-sm hover:bg-surface md:grid-cols-[1.4fr_1.4fr_1fr_1fr] md:items-center md:gap-4 md:px-2"
               >
-                <span>{item.expected || "Outcome"}</span>
-                <span className="text-muted">Observed {item.observed || "—"}</span>
+                <span className="min-w-0 break-words">{summarizeOutcomeValue(item.expected) || "Outcome"}</span>
+                <span className="min-w-0 break-words text-muted">Observed {summarizeOutcomeValue(item.observed) || "—"}</span>
                 <StatusText tone={statusTone(item.status)}>{outcomeLabel(item.status)}</StatusText>
                 <span className="text-muted">{formatUtc(item.verifiedAt ?? item.createdAt)}</span>
               </Link>
@@ -164,4 +164,21 @@ function FilterLink({
       {label}
     </Link>
   );
+}
+
+/** Outcome expectations are stored as JSON; show them as short readable text. */
+function summarizeOutcomeValue(value: string | null | undefined): string {
+  if (!value) return "";
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object") return String(parsed);
+    const entries = Object.entries(parsed as Record<string, unknown>).filter(([key]) => key !== "type");
+    const event = entries.find(([key]) => key === "event")?.[1];
+    const rest = entries
+      .filter(([key]) => key !== "event")
+      .map(([key, val]) => `${key} ${typeof val === "object" ? JSON.stringify(val) : String(val)}`);
+    return [event ? String(event) : null, ...rest].filter(Boolean).join(" · ");
+  } catch {
+    return value;
+  }
 }

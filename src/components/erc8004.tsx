@@ -56,7 +56,7 @@ export function Erc8004Panel({ agentId, owner }: { agentId: string; owner: strin
 
   if (!status) {
     return (
-      <div className="grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-4" aria-hidden>
+      <div className="grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-4" aria-hidden>
         {[0, 1, 2, 3].map((n) => (
           <div key={n} className="bg-bg p-4">
             <div className="h-3 w-20 animate-pulse rounded-sm bg-subtle" />
@@ -75,7 +75,7 @@ export function Erc8004Panel({ agentId, owner }: { agentId: string; owner: strin
           : "Not linked to ERC-8004 yet. Once linked, AgentTrace publishes each verified proof and outcome to the shared ERC-8004 registries, where anyone can read them onchain."}
       </p>
       {linked && status.link ? (
-        <dl className="mt-4 grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-4">
+        <dl className="mt-4 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-4">
           <Cell label="Identity">
             <ExplorerLink href={addressUrl(status.registries.identity)}>#{status.link.erc8004Id}</ExplorerLink>
           </Cell>
@@ -194,7 +194,7 @@ export function Erc8004Validation({ executionId, txHash, owner }: { executionId:
               ? "Validation was requested. Waiting for the AgentTrace verifier to respond onchain."
               : "Not yet published. The agent owner can request validation; the AgentTrace verifier then answers onchain."}
       </p>
-      <dl className="mt-4 grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-3">
+      <dl className="mt-4 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3 lg:grid-cols-1">
         <Cell label="Identity">{link ? `ERC-8004 #${link.erc8004Id}` : "Not linked"}</Cell>
         <Cell label="Validation">
           {responded ? (

@@ -29,7 +29,7 @@ function SandboxPage() {
 
   return (
     <Shell>
-      <p className="font-mono text-xs tracking-widest text-faint">MONAD TESTNET · TEST ENVIRONMENT</p>
+      <p className="font-mono text-xs tracking-widest text-faint">{MONAD_TESTNET.label.toUpperCase()} · TEST CONTRACT</p>
       <h1 className="mt-2 text-2xl font-medium tracking-tight">AgentTrace Demo Protocol</h1>
       <p className="mt-3 max-w-xl text-sm text-muted">
         A test contract for the AgentTrace path. It is not production DeFi. Chain <Mono>{MONAD_TESTNET.chainId}</Mono>.

@@ -71,7 +71,7 @@ function ProofPage() {
   }, [proofId]);
 
   return (
-    <Shell>
+    <Shell wide>
       {error ? <ErrorNote>{error}</ErrorNote> : null}
       {!error && proof === undefined ? <ProofSkeleton /> : null}
       {!error && proof === null ? <Missing detail={detail} /> : null}
@@ -154,8 +154,9 @@ function Record({
       </nav>
       <header className="mt-6">
         <Status status={proofStatusKey(proof)} label={phase ?? status} />
-        <h1 className="type-heading mt-4">
-          <Mono>{shortId(proof.executionId)}</Mono>
+        <h1 className="type-heading mt-4 flex flex-wrap items-baseline gap-x-3">
+          <span>Execution</span>
+          <span className="font-mono text-xl text-muted md:text-2xl">{shortId(proof.executionId)}</span>
         </h1>
         <p className="mt-3 max-w-xl text-sm text-pretty text-muted">
           {proof.verificationStatus === "receipt_verified"
@@ -166,7 +167,7 @@ function Record({
         </p>
       </header>
 
-      <div className="mt-8 grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-4">
+      <div className="mt-8 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
         <Evidence label="Transaction" ok={proof.checks.some((item) => item.name === "transactionSucceeded" && item.passed)}>
           {formatUtc(proof.blockTimestamp)}
         </Evidence>
@@ -174,7 +175,7 @@ function Record({
           {proof.checks.length ? `${proof.checks.filter((check) => check.passed).length} of ${proof.checks.length} passed` : "Pending"}
         </Evidence>
         <Evidence label="Anchored onchain" ok={proof.anchored}>
-          {proof.anchorTxHash ? <TxValue hash={proof.anchorTxHash} /> : "Not yet"}
+          {proof.anchorTxHash ? <TxValue hash={proof.anchorTxHash} /> : proof.anchored ? "Anchored in AgentProof" : "Not yet"}
         </Evidence>
         <Evidence label="Outcome" ok={null}>
           <Link to="/outcomes/$executionId" params={{ executionId: proof.executionId }} className="hover:underline">
@@ -183,7 +184,9 @@ function Record({
         </Evidence>
       </div>
 
-      <dl className="mt-8 border-t border-border">
+      <div className="mt-8 grid gap-x-12 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div className="min-w-0">
+      <dl className="border-t border-border">
         <Fact label="Agent">
           <Link to="/agents/$agentId" params={{ agentId: proof.agentId }} className="hover:underline">
             {proof.agentName || "Agent"} <Mono>{formatAgentId(proof.agentId)}</Mono>
@@ -261,7 +264,9 @@ function Record({
         ) : null}
       </section>
 
-      <section className="mt-10 border-t border-border pt-6">
+      </div>
+      <div className="min-w-0">
+      <section className="mt-10 border-t border-border pt-6 lg:mt-0">
         <h2 className="text-sm font-medium">Anchor</h2>
         <p className="mt-2 text-sm text-muted">
           {proof.anchored ? "The verified proof hash was committed onchain." : "Not anchored"}
@@ -314,6 +319,8 @@ function Record({
           <Fact label="Method">{proof.verificationMethod ?? "—"}</Fact>
         </dl>
       </details>
+      </div>
+      </div>
     </article>
   );
 }

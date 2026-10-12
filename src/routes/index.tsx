@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { listConfigurableAgents, listMyIntents } from "@/lib/agents/functions";
-import type { RegistrationIntent } from "@/lib/agents/types";
+import { listConfigurableAgents, listMyIntents, listProofs } from "@/lib/agents/functions";
+import type { ProofRecord, RegistrationIntent } from "@/lib/agents/types";
 import { GROK_PROVIDERS, authEnabled, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Shell } from "@/components/shell";
 import { buttonClass, EmptyState, ErrorNote, Mono, SkeletonLines, StatusText } from "@/components/ui";
-import { formatAgentId, statusLabel, statusTone } from "@/lib/format";
+import { formatAgentId, formatUtc, functionName, proofStatusLabel, statusLabel, statusTone } from "@/lib/format";
 import { IS_MAINNET, MONAD_TESTNET } from "@/lib/chain/network";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -192,57 +192,60 @@ function Landing({ pending }: { pending: boolean }) {
   const secondaryClass = buttonClass("secondary", "w-full sm:w-auto");
 
   return (
-    <Shell>
-      <section className="pt-2">
-        <p className="flex items-center gap-2 font-mono text-xs tracking-widest text-faint uppercase">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-ok" aria-hidden />
-          Live on {MONAD_TESTNET.label} · chain {MONAD_TESTNET.chainId}
-        </p>
-        <h1 className="type-display mt-5 max-w-2xl text-balance">Every agent leaves a trace.</h1>
-        <p className="mt-5 max-w-xl text-base text-pretty text-muted">
-          AgentTrace is an independent validator for onchain agents. It fences what an agent may call, checks from the
-          Monad receipt whether the call achieved its purpose, and publishes that verdict to the shared ERC-8004
-          registries, so anyone can read an agent's record without trusting this site.
-        </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Link to="/proofs/$proofId" params={{ proofId: SHOWCASE.proof }} className={primaryClass}>
-            See a verified execution
-          </Link>
-          <Link to="/demo" className={secondaryClass}>
-            One-click demo
-          </Link>
-          {pending ? <div className="h-11 w-full animate-pulse rounded-sm bg-subtle sm:w-40" /> : null}
-          {!pending && !authEnabled ? (
-            <Link to="/agents/new" className={buttonClass("tertiary", "w-full justify-start px-0 sm:w-auto")}>
-              Register an agent
+    <Shell wide>
+      <section className="grid gap-12 pt-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-16 lg:pt-6">
+        <div>
+          <p className="flex items-center gap-2 font-mono text-xs tracking-widest text-faint uppercase">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-ok" aria-hidden />
+            Live on {MONAD_TESTNET.label} · chain {MONAD_TESTNET.chainId}
+          </p>
+          <h1 className="type-display mt-5 max-w-xl text-balance">Every agent leaves a trace.</h1>
+          <p className="mt-5 max-w-lg text-base text-pretty text-muted">
+            AgentTrace is an independent validator for onchain agents. It fences what an agent may call, checks from the
+            Monad receipt whether the call achieved its purpose, and publishes that verdict to the shared ERC-8004
+            registries, so anyone can read an agent's record without trusting this site.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Link to="/proofs/$proofId" params={{ proofId: SHOWCASE.proof }} className={primaryClass}>
+              See a verified execution
             </Link>
-          ) : null}
-          {!pending && authEnabled && google ? (
-            <button type="button" disabled={signingIn} onClick={createAgent} className={buttonClass("tertiary", "w-full justify-start px-0 sm:w-auto")}>
-              {signingIn ? "Continuing…" : "Register an agent"}
-            </button>
-          ) : null}
+            <Link to="/demo" className={secondaryClass}>
+              One-click demo
+            </Link>
+            {pending ? <div className="h-11 w-full animate-pulse rounded-sm bg-subtle sm:w-40" /> : null}
+            {!pending && !authEnabled ? (
+              <Link to="/agents/new" className={buttonClass("tertiary", "w-full justify-start px-0 sm:w-auto sm:px-2")}>
+                Register an agent →
+              </Link>
+            ) : null}
+            {!pending && authEnabled && google ? (
+              <button type="button" disabled={signingIn} onClick={createAgent} className={buttonClass("tertiary", "w-full justify-start px-0 sm:w-auto")}>
+                {signingIn ? "Continuing…" : "Register an agent"}
+              </button>
+            ) : null}
+          </div>
+          {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
         </div>
-        {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
+        <RecentProofs />
       </section>
 
       <section className="mt-16 border-t border-border pt-8" aria-labelledby="how">
         <h2 id="how" className="text-sm font-medium">
           How one agent action is checked
         </h2>
-        <ol className="mt-4 divide-y divide-border border-y border-border">
+        <ol className="mt-5 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3 lg:grid-cols-6">
           {STEPS.map((step, index) => (
-            <li key={step.title} className="grid grid-cols-[2.25rem_1fr] gap-x-4 gap-y-1 py-3 text-sm sm:grid-cols-[2.25rem_7rem_1fr_11rem] sm:items-baseline">
-              <span className="font-mono text-xs text-faint">{String(index + 1).padStart(2, "0")}</span>
-              <span className="font-medium">{step.title}</span>
-              <span className="col-start-2 text-muted sm:col-start-auto">{step.text}</span>
-              <span className="type-technical col-start-2 text-xs text-faint sm:col-start-auto sm:text-right">{step.where}</span>
+            <li key={step.title} className="flex flex-col bg-bg p-5">
+              <span className="font-mono text-xs text-accent">{String(index + 1).padStart(2, "0")}</span>
+              <span className="mt-3 text-sm font-medium">{step.title}</span>
+              <span className="mt-1 flex-1 text-sm text-muted">{step.text}</span>
+              <span className="type-technical mt-4 text-xs text-faint">{step.where}</span>
             </li>
           ))}
         </ol>
       </section>
 
-      <section className="mt-14 grid gap-10 border-t border-border pt-8 md:grid-cols-[1fr_1.1fr]" aria-labelledby="any-agent">
+      <section className="mt-14 grid gap-10 border-t border-border pt-8 lg:grid-cols-[1fr_1.1fr] lg:gap-16" aria-labelledby="any-agent">
         <div>
           <h2 id="any-agent" className="text-sm font-medium">
             Works with agents you already run
@@ -267,7 +270,7 @@ function Landing({ pending }: { pending: boolean }) {
             </a>
           </div>
         </div>
-        <pre className="type-technical overflow-x-auto rounded-sm border border-border bg-subtle/40 p-4 text-xs leading-relaxed text-muted">
+        <pre className="type-technical overflow-x-auto rounded-lg border border-border bg-surface p-5 text-xs leading-relaxed text-muted">
           <code>{SNIPPET}</code>
         </pre>
       </section>
@@ -279,12 +282,14 @@ function Landing({ pending }: { pending: boolean }) {
         <p className="mt-3 max-w-2xl text-sm text-pretty text-muted">
           What AgentTrace still asks you to trust, and how each part is being removed.
         </p>
-        <ul className="mt-4 divide-y divide-border border-y border-border text-sm">
+        <ul className="mt-5 grid gap-4 text-sm md:grid-cols-3">
           {TRUST.map((item) => (
-            <li key={item.title} className="grid gap-1 py-3 sm:grid-cols-[12rem_1fr_9rem] sm:items-baseline sm:gap-4">
-              <span className="font-medium">{item.title}</span>
-              <span className="text-muted">{item.text}</span>
-              <span className={`text-xs sm:text-right ${item.live ? "text-ok" : "text-faint"}`}>{item.status}</span>
+            <li key={item.title} className="flex flex-col rounded-lg border border-border bg-surface p-5">
+              <span className="flex items-baseline justify-between gap-3">
+                <span className="font-medium">{item.title}</span>
+                <span className={`text-xs ${item.live ? "text-ok" : "text-faint"}`}>{item.status}</span>
+              </span>
+              <span className="mt-2 text-muted">{item.text}</span>
             </li>
           ))}
         </ul>
@@ -293,7 +298,7 @@ function Landing({ pending }: { pending: boolean }) {
         </a>
       </section>
 
-      <section className="mt-14 grid gap-10 border-t border-border pt-8 md:grid-cols-2">
+      <section className="mt-14 grid gap-10 border-t border-border pt-8 lg:grid-cols-2 lg:gap-16">
         <div>
           <h2 className="text-sm font-medium">Why an independent validator</h2>
           <p className="mt-3 text-sm text-pretty text-muted">
@@ -330,5 +335,66 @@ function Landing({ pending }: { pending: boolean }) {
         </div>
       </section>
     </Shell>
+  );
+}
+
+function RecentProofs() {
+  const [proofs, setProofs] = useState<ProofRecord[] | null>(null);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    listProofs()
+      .then((result) => {
+        if (!cancelled) setProofs(result.proofs.slice(0, 6));
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return (
+    <div className="min-w-0 self-start rounded-lg border border-border bg-surface">
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <h2 className="text-sm font-medium">Latest executions</h2>
+        <Link to="/proofs" className="text-xs text-muted hover:text-fg">
+          All proofs →
+        </Link>
+      </div>
+      {error ? <p className="px-5 py-6 text-sm text-muted">Could not read proofs right now.</p> : null}
+      {proofs === null && !error ? (
+        <div className="space-y-3 px-5 py-5" aria-hidden>
+          {[0, 1, 2, 3].map((n) => (
+            <span key={n} className="skeleton block h-8 w-full" />
+          ))}
+        </div>
+      ) : null}
+      {proofs && proofs.length === 0 ? <p className="px-5 py-6 text-sm text-muted">No executions indexed yet.</p> : null}
+      {proofs && proofs.length > 0 ? (
+        <ul className="divide-y divide-border">
+          {proofs.map((proof) => (
+            <li key={proof.executionId}>
+              <Link
+                to="/proofs/$proofId"
+                params={{ proofId: proof.executionId }}
+                className="grid grid-cols-1 gap-x-4 gap-y-1 px-5 py-3 text-sm hover:bg-subtle sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+              >
+                <span className="truncate">
+                  {proof.agentName || "Agent"} <span className="font-mono text-xs text-faint">{formatAgentId(proof.agentId)}</span>
+                </span>
+                <StatusText tone={proof.verificationStatus === "receipt_verified" ? "ok" : proof.verificationStatus === "unverifiable" ? "danger" : "pending"}>
+                  {proofStatusLabel(proof.verificationStatus, proof.anchored)}
+                </StatusText>
+                <span className="truncate font-mono text-xs text-muted">
+                  {proof.executionId.slice(0, 10)}…{proof.executionId.slice(-6)} · {functionName(proof.functionSelector) ?? proof.functionSelector}
+                </span>
+                <span className="text-xs text-faint sm:text-right">{formatUtc(proof.blockTimestamp ?? proof.createdAt)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }

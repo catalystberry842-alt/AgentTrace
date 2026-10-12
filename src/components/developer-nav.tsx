@@ -7,9 +7,9 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 const LINKS = [
   { to: "/developers", label: "Overview" },
   { to: "/developers/docs", label: "Docs" },
-  { to: "/developers/sdk", label: "SDK" },
+  { to: "/developers/sdk", label: "SDK & MCP" },
   { to: "/developers/api", label: "API" },
-  { to: "/developers/webhooks", label: "Webhooks" },
+  { to: "/developers/explorer", label: "API explorer" },
 ] as const;
 
 export function DeveloperNav({ current }: { current: string }) {
@@ -22,7 +22,7 @@ export function DeveloperNav({ current }: { current: string }) {
             <Link
               key={item.to}
               to={item.to}
-              className={`inline-flex h-11 shrink-0 items-center border-b px-3 text-sm ${active ? "border-fg text-fg" : "border-transparent text-muted hover:text-fg"}`}
+              className={`inline-flex h-11 shrink-0 items-center border-b px-3 text-sm ${active ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg"}`}
               aria-current={active ? "page" : undefined}
             >
               {item.label}

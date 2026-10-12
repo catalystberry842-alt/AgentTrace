@@ -10,7 +10,7 @@ const BUTTON_BASE =
   "inline-flex h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium transition-colors duration-150 select-none disabled:cursor-not-allowed disabled:opacity-40";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-accent-fg hover:bg-fg active:opacity-80",
+  primary: "bg-accent text-accent-fg hover:bg-accent-hover active:opacity-80",
   secondary: "border border-border bg-transparent text-fg hover:bg-subtle active:bg-surface-elevated",
   tertiary: "bg-transparent px-2 text-fg hover:text-muted",
   ghost: "bg-transparent px-2 text-muted hover:text-fg",

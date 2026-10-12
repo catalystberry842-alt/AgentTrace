@@ -43,7 +43,7 @@ function FirewallPage() {
   }, [firewallId]);
 
   return (
-    <Shell>
+    <Shell wide>
       {error ? <ErrorNote>{error}</ErrorNote> : null}
       {!error && firewall === undefined ? <SkeletonLines /> : null}
       {!error && firewall === null ? <Missing detail={detail} /> : null}
@@ -103,7 +103,7 @@ function Record({
     <article>
       <header>
         <p className="font-mono text-xs tracking-widest text-faint">FIREWALL</p>
-        <h1 className="mt-2 text-2xl font-medium tracking-tight">Firewall {formatAgentId(firewall.id)}</h1>
+        <h1 className="type-heading mt-2 md:text-3xl">Firewall {formatAgentId(firewall.id)}</h1>
         <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
           <StatusText tone={statusTone(firewall.status)}>{status}</StatusText>
           <span aria-hidden>·</span>
@@ -117,7 +117,9 @@ function Record({
         </p>
       </header>
 
-      <dl className="mt-8 border-t border-border">
+      <div className="mt-8 grid gap-x-12 lg:grid-cols-2">
+      <div className="min-w-0">
+      <dl className="border-t border-border">
         <Fact label="Agent">
           <Link to="/agents/$agentId" params={{ agentId: firewall.agentId }} className="hover:underline">
             {firewall.agentName || "Agent"} <Mono>{formatAgentId(firewall.agentId)}</Mono>
@@ -146,8 +148,9 @@ function Record({
           ) : null}
         </dl>
       </section>
-
-      <section className="mt-10">
+      </div>
+      <div className="min-w-0">
+      <section className="mt-10 lg:mt-0">
         <h2 className="text-sm font-medium">Allowed targets</h2>
         {targets.length ? (
           <ul className="mt-3 divide-y divide-border border-y border-border">
@@ -190,6 +193,9 @@ function Record({
           <p className="mt-3 text-sm text-muted">None</p>
         )}
       </section>
+
+      </div>
+      </div>
 
       <section className="mt-10">
         <h2 className="text-sm font-medium">Execution history</h2>

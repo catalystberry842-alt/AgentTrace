@@ -10,7 +10,7 @@
   --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
 
-  --color-bg: #09090b;
+  --color-bg: #0a0a0c;
   --color-surface: #111113;
   --color-surface-elevated: #18181b;
   --color-elevated: #111113;
@@ -24,8 +24,9 @@
   --color-border-subtle: #1c1c20;
   --color-border-strong: #3f3f46;
 
-  --color-accent: #f4f4f5;
-  --color-accent-fg: #09090b;
+  --color-accent: #836ef9;
+  --color-accent-hover: #9583fa;
+  --color-accent-fg: #ffffff;
 
   --color-success: #8eae96;
   --color-ok: #8eae96;

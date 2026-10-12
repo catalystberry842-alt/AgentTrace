@@ -18,13 +18,12 @@ import type { Capability } from "@/lib/agents/types";
 import { GROK_PROVIDERS, authEnabled, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { refreshOrResubmit } from "@/lib/agents/resilient";
-import { Shell } from "@/components/shell";
+import { Shell, WalletButton } from "@/components/shell";
 import { Button, ChainError, Mono, SkeletonLines, StatusText } from "@/components/ui";
 import { demoProtocolAbi } from "@/lib/chain/abi";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { formatAgentId, formatAgentLabel, proofStatusLabel, txUrl } from "@/lib/format";
 import { useWalletAccount } from "@/lib/chain/wallet-account";
-import { isMobileBrowser, metamaskDeepLink } from "@/lib/chain/injected";
 
 export const Route = createFileRoute("/demo")({ component: DemoPage });
 
@@ -96,9 +95,8 @@ function sleep(ms: number) {
 }
 
 function DemoPage() {
-  const { user, isPending } = useCurrentUserState();
   const wallet = useWalletAccount();
-  const [mobile, setMobile] = useState(false);
+  const { user, isPending } = useCurrentUserState();
   const [ready, setReady] = useState(false);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [gateNote, setGateNote] = useState<"rpc" | "missing" | null>(null);
@@ -115,7 +113,6 @@ function DemoPage() {
 
   useEffect(() => {
     setSaved(loadSaved());
-    setMobile(isMobileBrowser());
     setReady(true);
   }, []);
 
@@ -635,11 +632,11 @@ function DemoPage() {
   const observedAmount = saved.observed?.includes("100") ? "100" : null;
 
   return (
-    <Shell>
+    <Shell wide>
       <p className="font-mono text-xs tracking-widest text-faint">
         {MONAD_TESTNET.name} · Chain {MONAD_TESTNET.chainId}
       </p>
-      <h1 className="mt-2 text-2xl font-medium tracking-tight">AgentTrace Demo</h1>
+      <h1 className="type-heading mt-2 md:text-3xl">AgentTrace Demo</h1>
       <p className="mt-3 max-w-xl text-sm text-muted">
         See how AgentTrace gives an AI agent identity, controlled execution and verifiable outcomes.
       </p>
@@ -651,30 +648,6 @@ function DemoPage() {
           </li>
         ))}
       </ol>
-
-      <div className="mt-6 flex flex-wrap items-center gap-3 text-sm" aria-live="polite">
-        {wallet.address ? (
-          <span>
-            <StatusText tone="ok">Wallet connected</StatusText> <Mono>{`${wallet.address.slice(0, 6)}…${wallet.address.slice(-4)}`}</Mono>
-          </span>
-        ) : wallet.ready && !wallet.available && mobile ? (
-          <a href={metamaskDeepLink()} className="underline">
-            Open this demo in the MetaMask app
-          </a>
-        ) : (
-          <Button type="button" variant="secondary" disabled={!wallet.ready} onClick={() => void wallet.connect()}>
-            Connect wallet
-          </Button>
-        )}
-        {wallet.error ? <span className="text-danger">{wallet.error}</span> : null}
-        {wallet.ready && !wallet.available && !wallet.error ? (
-          <span className="text-muted">
-            {mobile
-              ? "Phone browsers have no wallet. Open this page in your wallet app's built-in browser."
-              : "No wallet detected. Install or unlock MetaMask, Rabby or OKX, then reload."}
-          </span>
-        ) : null}
-      </div>
 
       {configured === null ? <div className="mt-10"><SkeletonLines /></div> : null}
       {configured === false && gateNote === "rpc" ? (
@@ -701,8 +674,9 @@ function DemoPage() {
       ) : null}
 
       {configured && user ? (
-        <div className="mt-10 max-w-xl space-y-8">
-          <section className="rounded-sm border border-border p-5">
+        <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-14">
+        <div className="min-w-0 max-w-2xl space-y-8">
+          <section className="rounded-lg border border-accent/40 bg-surface p-5">
             <h2 className="text-sm font-medium">Run the whole demo in one click</h2>
             <p className="mt-2 text-sm text-muted">
               Connect once and confirm the setup once. Your wallet registers the agent and fences it (firewall, target,
@@ -933,6 +907,41 @@ function DemoPage() {
             </Button>
             <p className="mt-2 text-sm text-muted">Clears this browser’s demo position. Indexed chain history is not deleted.</p>
           </div>
+        </div>
+        <aside className="order-first lg:order-none">
+          <div className="space-y-4 rounded-lg border border-border bg-surface p-5 lg:sticky lg:top-20">
+            <div>
+              <h2 className="text-sm font-medium">Wallet</h2>
+              <p className="mt-1 text-sm text-muted">
+                {wallet.address ? "Connected. Every step below signs with this wallet." : `Connect once. Every step signs with the same wallet on ${MONAD_TESTNET.label}.`}
+              </p>
+              <div className="mt-3">
+                <WalletButton full />
+              </div>
+            </div>
+            <div className="border-t border-border pt-4">
+              <h2 className="text-sm font-medium">Progress</h2>
+              <ol className="mt-3 space-y-2 text-sm">
+                {[
+                  ["Agent registered", Boolean(saved.agentId)],
+                  ["Firewall created", Boolean(saved.firewallId)],
+                  ["Permission set", permissionReady],
+                  ["Action executed", Boolean(saved.executionId)],
+                  ["Proof verified", saved.proofStatus === "receipt_verified"],
+                  ["Outcome verified", saved.outcomeStatus === "verified"],
+                  ["Proof anchored", Boolean(saved.anchorTxHash)],
+                ].map(([label, done]) => (
+                  <li key={String(label)} className="flex items-center gap-3">
+                    <span className={`grid h-4 w-4 place-items-center rounded-full border text-[10px] ${done ? "border-ok text-ok" : "border-border text-transparent"}`} aria-hidden>
+                      ✓
+                    </span>
+                    <span className={done ? "text-fg" : "text-muted"}>{label}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </aside>
         </div>
       ) : null}
     </Shell>

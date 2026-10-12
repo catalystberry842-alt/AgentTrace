@@ -75,7 +75,7 @@ export function AgentFrame({
                   to={tab.to}
                   params={{ agentId }}
                   aria-current={active ? "page" : undefined}
-                  className={`inline-flex h-11 shrink-0 items-center border-b px-3 text-sm md:border-b-0 md:border-l md:px-3 ${active ? "border-fg text-fg" : "border-transparent text-muted hover:text-fg"}`}
+                  className={`inline-flex h-11 shrink-0 items-center border-b px-3 text-sm md:border-b-0 md:border-l md:px-3 ${active ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg"}`}
                 >
                   {tab.label}
                 </Link>

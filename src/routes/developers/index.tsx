@@ -4,12 +4,30 @@ import { getChainStatus } from "@/lib/agents/functions";
 import type { ChainStatus } from "@/lib/agents/types";
 import { DeveloperNav } from "@/components/developer-nav";
 import { Shell } from "@/components/shell";
-import { buttonClass, ErrorNote, Mono } from "@/components/ui";
-import { MONAD_TESTNET } from "@/lib/chain/network";
+import { CodeBlock, ErrorNote } from "@/components/ui";
+import { AddressValue } from "@/components/values";
+import { IS_MAINNET, MONAD_TESTNET } from "@/lib/chain/network";
 
 export const Route = createFileRoute("/developers/")({ component: DevelopersPage });
 
-const STEPS = ["Register", "Control", "Execute", "Verify"] as const;
+const NETWORK = IS_MAINNET ? "monad-mainnet" : "monad-testnet";
+
+const SNIPPET = `import { traceCall } from "agenttrace-monad";
+
+const r = await traceCall({
+  network: "${NETWORK}",
+  signer: process.env.AGENT_KEY, // the firewall's executor
+  firewallId: 2,
+  target, data,                  // the call your agent wanted to make
+});
+// off-policy calls throw FIREWALL_REJECTED before anything is sent
+// r: { txHash, executionId, proofStatus, proofHash, anchorTxHash, proofUrl }`;
+
+const SURFACES = [
+  { title: "SDK · traceCall", text: "One function wraps an existing agent call: simulate through the firewall, send, verify the receipt, anchor the proof.", to: "/developers/sdk" as const, cta: "SDK reference" },
+  { title: "MCP server", text: "Any MCP host (Claude Desktop, Cursor, agent runtimes) gets firewall-bound tools. The model cannot step outside the onchain policy.", to: "/developers/sdk" as const, cta: "MCP config" },
+  { title: "HTTP API", text: "Public read API for agents, firewalls, executions, proofs and outcomes under /api/v1. No key needed to read.", to: "/developers/api" as const, cta: "Endpoints" },
+];
 
 function DevelopersPage() {
   const [status, setStatus] = useState<ChainStatus | null>(null);
@@ -29,63 +47,63 @@ function DevelopersPage() {
     };
   }, []);
 
+  const contracts: [string, string | null | undefined][] = [
+    ["AgentRegistry", status?.registry],
+    ["AgentFirewall", status?.firewall],
+    ["AgentProof", status?.proofAnchor],
+    ["DemoProtocol", status?.demoProtocol],
+  ];
+
   return (
-    <Shell>
+    <Shell wide>
       <p className="type-caption text-faint">Developers</p>
       <h1 className="type-heading mt-2 text-balance md:text-3xl">Build with AgentTrace</h1>
-      <p className="mt-3 max-w-xl text-sm text-pretty text-muted">
-        Give your AI agents identity, controlled execution and verifiable history on Monad.
+      <p className="mt-3 max-w-2xl text-sm text-pretty text-muted">
+        Give an existing agent an onchain identity, a permission firewall and receipt-verified proofs on {MONAD_TESTNET.label}, without changing how it decides what to do.
       </p>
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <Link to="/developers/api-keys" className={buttonClass("primary", "w-full sm:w-auto")}>
-          Create API key
-        </Link>
-        <Link to="/developers/sandbox" className={buttonClass("secondary", "w-full sm:w-auto")}>
-          Open sandbox
-        </Link>
-      </div>
-      <ol className="mt-10 flex flex-wrap gap-x-3 gap-y-2 text-sm" aria-label="Integration">
-        {STEPS.map((step, index) => (
-          <li key={step} className="flex items-center gap-3">
-            {index > 0 ? (
-              <span className="text-faint" aria-hidden>
-                →
-              </span>
-            ) : null}
-            <span>{step}</span>
-          </li>
-        ))}
-      </ol>
       <DeveloperNav current="/developers" />
-      {error ? (
-        <div className="mt-8">
-          <ErrorNote>{error}</ErrorNote>
-        </div>
-      ) : null}
-      <section className="mt-10 border-t border-border pt-6">
-        <h2 className="text-sm font-medium">Monad testnet</h2>
-        <p className="mt-2 text-sm text-muted">
-          Chain <Mono>{MONAD_TESTNET.chainId}</Mono>. Mainnet is not available.
-        </p>
-        <dl className="mt-4 border-t border-border text-sm">
-          <Row label="Registry" value={status ? (status.registry ? status.registry : "Not deployed") : "—"} />
-          <Row label="Firewall" value={status ? (status.firewall ? status.firewall : "Not deployed") : "—"} />
-          <Row label="Proof anchor" value={status ? (status.proofAnchor ? status.proofAnchor : "Not deployed") : "—"} />
-          <Row label="Demo protocol" value={status ? (status.demoProtocol ? status.demoProtocol : "Not deployed") : "—"} />
-        </dl>
-        <p className="mt-4 max-w-xl text-sm text-muted">
-          Until those contracts are deployed, the API will not return a confirmed agent, firewall, or execution. It does not invent ids or transaction hashes.
-        </p>
-      </section>
-    </Shell>
-  );
-}
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-1 border-b border-border py-3 sm:flex-row sm:gap-8">
-      <dt className="text-xs tracking-widest text-muted uppercase sm:w-40 sm:shrink-0">{label}</dt>
-      <dd className="min-w-0 font-mono text-sm break-all">{value}</dd>
-    </div>
+      <div className="mt-8 grid gap-4 md:grid-cols-3">
+        {SURFACES.map((item) => (
+          <Link key={item.title} to={item.to} className="group flex flex-col rounded-lg border border-border bg-surface p-5 hover:border-border-strong">
+            <h2 className="text-sm font-medium">{item.title}</h2>
+            <p className="mt-2 flex-1 text-sm text-muted">{item.text}</p>
+            <span className="mt-4 text-sm text-accent group-hover:underline">{item.cta} →</span>
+          </Link>
+        ))}
+      </div>
+
+      <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+        <section>
+          <h2 className="text-sm font-medium">Quickstart</h2>
+          <p className="mt-2 text-sm text-muted">The agent keeps its own key and logic. AgentTrace only bounds and records the call.</p>
+          <CodeBlock language="ts" code={SNIPPET} />
+        </section>
+        <section>
+          <h2 className="text-sm font-medium">
+            Contracts · {MONAD_TESTNET.label} · chain {MONAD_TESTNET.chainId}
+          </h2>
+          {error ? (
+            <div className="mt-4">
+              <ErrorNote>{error}</ErrorNote>
+            </div>
+          ) : null}
+          <dl className="mt-4 divide-y divide-border rounded-lg border border-border">
+            {contracts.map(([label, value]) => (
+              <div key={label} className="flex items-center justify-between gap-4 px-4 py-3">
+                <dt className="text-sm text-muted">{label}</dt>
+                <dd className="min-w-0 text-right">
+                  {status === null ? <span className="skeleton inline-block h-4 w-32" /> : value ? <AddressValue value={value} copy explorer /> : <span className="text-sm text-faint">Not deployed</span>}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-4 text-sm text-muted">
+            Want to see the full path first? <Link to="/demo" className="text-fg underline-offset-4 hover:underline">Run the live demo</Link> with your wallet, or read the{" "}
+            <Link to="/developers/docs" className="text-fg underline-offset-4 hover:underline">docs</Link>.
+          </p>
+        </section>
+      </div>
+    </Shell>
   );
 }

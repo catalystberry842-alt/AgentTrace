@@ -3,14 +3,20 @@ import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { authEnabled, signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { searchTrace } from "@/lib/agents/functions";
+import { useWalletAccount } from "@/lib/chain/wallet-account";
+import { IS_MAINNET, MONAD_TESTNET } from "@/lib/chain/network";
+import { toast } from "sonner";
+import { isMobileBrowser, metamaskDeepLink, noWalletMessage } from "@/lib/chain/injected";
 
 const NAV = [
   { to: "/agents", label: "Agents", match: (path: string) => path.startsWith("/agents") },
+  { to: "/firewalls", label: "Firewalls", match: (path: string) => path.startsWith("/firewalls") },
   { to: "/proofs", label: "Proofs", match: (path: string) => path.startsWith("/proofs") || path.startsWith("/outcomes") },
+  { to: "/demo", label: "Demo", match: (path: string) => path.startsWith("/demo") },
   { to: "/developers", label: "Developers", match: (path: string) => path.startsWith("/developers") },
 ] as const;
 
-type NavTo = "/agents" | "/proofs" | "/developers" | "/settings" | "/login" | "/";
+type NavTo = "/agents" | "/firewalls" | "/proofs" | "/demo" | "/developers" | "/settings" | "/login" | "/";
 
 type Hit = { kind: string; id: string; label: string; href: string };
 
@@ -29,7 +35,7 @@ function NavLink({
     <Link
       to={to}
       onClick={onNavigate}
-      className={`flex h-11 items-center text-sm transition-colors duration-150 ${active ? "text-fg" : "text-muted hover:text-fg"}`}
+      className={`relative flex h-14 items-center text-sm transition-colors duration-150 ${active ? "text-fg after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-accent" : "text-muted hover:text-fg"}`}
       aria-current={active ? "page" : undefined}
     >
       {label}
@@ -240,6 +246,125 @@ function AccountMenuSignedIn({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+function shortAddress(address: string) {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+/** The single wallet connection for the app. Every write action reuses it. */
+export function WalletButton({ full = false }: { full?: boolean }) {
+  const wallet = useWalletAccount();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (wallet.error) toast.error(wallet.error);
+  }, [wallet.error]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointer(event: MouseEvent) {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    }
+    window.addEventListener("mousedown", onPointer);
+    return () => window.removeEventListener("mousedown", onPointer);
+  }, [open]);
+
+  const base = `inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors duration-150 ${full ? "w-full" : ""}`;
+
+  if (!wallet.ready) return <span className={`skeleton block h-9 ${full ? "w-full" : "w-32"}`} aria-hidden />;
+
+  if (!wallet.address) {
+    return (
+      <button
+        type="button"
+        data-testid="connect-wallet"
+        disabled={wallet.connecting}
+        className={`${base} bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-60`}
+        onClick={() => {
+          if (!wallet.available) {
+            if (isMobileBrowser()) {
+              toast.error(noWalletMessage(), { action: { label: "Open in MetaMask", onClick: () => window.location.assign(metamaskDeepLink()) } });
+            } else {
+              toast.error(noWalletMessage());
+            }
+            return;
+          }
+          void wallet.connect();
+        }}
+      >
+        {wallet.connecting ? "Connecting…" : "Connect wallet"}
+      </button>
+    );
+  }
+
+  if (!wallet.onMonad) {
+    return (
+      <button type="button" className={`${base} border border-warn/50 text-warn hover:bg-subtle`} onClick={() => void wallet.connect()}>
+        Switch to {MONAD_TESTNET.label}
+      </button>
+    );
+  }
+
+  return (
+    <div className={`relative ${full ? "w-full" : ""}`} ref={ref}>
+      <button
+        type="button"
+        data-testid="wallet-connected"
+        className={`${base} border border-border bg-surface font-mono text-xs text-fg hover:border-border-strong`}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-ok" aria-hidden />
+        {shortAddress(wallet.address)}
+      </button>
+      {open ? (
+        <div role="menu" className="absolute right-0 z-30 mt-2 w-60 rounded-md border border-border bg-surface py-1 shadow-xl">
+          <p className="px-3 pt-2 font-mono text-xs break-all text-muted">{wallet.address}</p>
+          <p className="px-3 pt-1 pb-2 text-xs text-faint">
+            {MONAD_TESTNET.label} · chain {MONAD_TESTNET.chainId}
+          </p>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex h-10 w-full items-center px-3 text-left text-sm hover:bg-subtle"
+            onClick={() => {
+              void navigator.clipboard?.writeText(wallet.address ?? "");
+              toast.success("Address copied");
+              setOpen(false);
+            }}
+          >
+            Copy address
+          </button>
+          <a
+            role="menuitem"
+            className="flex h-10 items-center px-3 text-sm hover:bg-subtle"
+            href={`${MONAD_TESTNET.explorerUrl}/address/${wallet.address}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            View on explorer ↗
+          </a>
+          <Link role="menuitem" to="/agents/new" className="flex h-10 items-center px-3 text-sm hover:bg-subtle" onClick={() => setOpen(false)}>
+            Register an agent
+          </Link>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex h-10 w-full items-center border-t border-border px-3 text-left text-sm text-muted hover:bg-subtle hover:text-fg"
+            onClick={() => {
+              wallet.disconnect();
+              setOpen(false);
+            }}
+          >
+            Disconnect
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function Shell({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   const [menu, setMenu] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -263,50 +388,88 @@ export function Shell({ children, wide = false }: { children: ReactNode; wide?: 
   }, []);
 
   return (
-    <div className="min-h-screen bg-bg text-fg">
-      <header className="sticky top-0 z-20 border-b border-border bg-bg">
-        <div className={`mx-auto flex h-14 w-full items-center gap-6 px-5 ${wide ? "max-w-5xl" : "max-w-3xl"}`}>
-          <Link to="/" className="shrink-0 text-sm font-medium tracking-tight">
+    <div className="flex min-h-screen flex-col bg-bg text-fg">
+      <header className="sticky top-0 z-20 border-b border-border bg-bg/95 backdrop-blur">
+        <div className="mx-auto flex h-14 w-full max-w-[1240px] items-center gap-8 px-5 lg:px-8">
+          <Link to="/" className="flex shrink-0 items-center gap-2 text-sm font-semibold tracking-tight">
+            <span className="grid h-5 w-5 place-items-center rounded-[5px] bg-accent font-mono text-[10px] text-accent-fg" aria-hidden>
+              AT
+            </span>
             AgentTrace
           </Link>
-          <nav className="hidden items-center gap-5 md:flex" aria-label="Product">
+          <nav className="hidden items-center gap-6 lg:flex" aria-label="Product">
             {NAV.map((item) => (
               <NavLink key={item.to} to={item.to} label={item.label} active={item.match(pathname)} />
             ))}
           </nav>
-          <div className="ml-auto hidden items-center gap-4 md:flex">
-            <button type="button" className="flex h-11 items-center gap-3 text-sm text-muted hover:text-fg" onClick={() => setSearchOpen(true)}>
-              Search
-              <kbd className="hidden font-mono text-xs text-faint lg:inline">Ctrl K</kbd>
+          <div className="ml-auto hidden items-center gap-3 lg:flex">
+            <button
+              type="button"
+              className="flex h-9 w-56 items-center justify-between rounded-md border border-border px-3 text-sm text-faint hover:border-border-strong hover:text-muted"
+              onClick={() => setSearchOpen(true)}
+            >
+              Search agents, txs…
+              <kbd className="font-mono text-[11px] text-faint">Ctrl K</kbd>
             </button>
+            <span className="flex h-9 items-center gap-2 rounded-md border border-border px-3 font-mono text-xs text-muted" title={`Chain ${MONAD_TESTNET.chainId}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${IS_MAINNET ? "bg-accent" : "bg-warn"}`} aria-hidden />
+              {IS_MAINNET ? "Mainnet" : "Testnet"} · {MONAD_TESTNET.chainId}
+            </span>
             <AccountMenu />
+            <WalletButton />
           </div>
-          <button
-            type="button"
-            className="ml-auto h-11 px-1 text-sm text-muted md:hidden"
-            aria-expanded={menu}
-            aria-controls="mobile-nav"
-            onClick={() => setMenu((value) => !value)}
-          >
-            {menu ? "Close" : "Menu"}
-          </button>
+          <div className="ml-auto flex items-center gap-2 lg:hidden">
+            <WalletButton />
+            <button
+              type="button"
+              className="h-9 rounded-md border border-border px-3 text-sm text-muted"
+              aria-expanded={menu}
+              aria-controls="mobile-nav"
+              onClick={() => setMenu((value) => !value)}
+            >
+              {menu ? "Close" : "Menu"}
+            </button>
+          </div>
         </div>
         {menu ? (
-          <div id="mobile-nav" className="border-t border-border px-5 py-2 md:hidden">
+          <div id="mobile-nav" className="border-t border-border px-5 py-2 lg:hidden">
+            <nav aria-label="Product" className="flex flex-col">
+              {NAV.map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMenu(false)}
+                  className={`flex h-11 items-center text-sm ${item.match(pathname) ? "text-fg" : "text-muted"}`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
             <button type="button" className="flex h-11 items-center text-sm text-muted" onClick={() => { setMenu(false); setSearchOpen(true); }}>
               Search
             </button>
-            <nav aria-label="Product">
-              {NAV.map((item) => (
-                <NavLink key={item.to} to={item.to} label={item.label} active={item.match(pathname)} onNavigate={() => setMenu(false)} />
-              ))}
-            </nav>
+            <p className="flex h-11 items-center gap-2 font-mono text-xs text-faint">
+              <span className={`h-1.5 w-1.5 rounded-full ${IS_MAINNET ? "bg-accent" : "bg-warn"}`} aria-hidden />
+              {MONAD_TESTNET.label} · chain {MONAD_TESTNET.chainId}
+            </p>
             <AccountMenu onNavigate={() => setMenu(false)} />
           </div>
         ) : null}
       </header>
       <CommandSearch open={searchOpen} onOpenChange={setSearchOpen} />
-      <main className={`page-enter mx-auto w-full px-5 py-10 md:py-14 ${wide ? "max-w-5xl" : "max-w-3xl"}`}>{children}</main>
+      <main className={`mx-auto w-full flex-1 px-5 py-8 md:py-12 lg:px-8 ${wide ? "max-w-[1240px]" : "max-w-[1240px]"}`}>
+        {wide ? children : <div className="mx-auto w-full max-w-[920px]">{children}</div>}
+      </main>
+      <footer className="border-t border-border">
+        <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-2 px-5 py-6 text-xs text-faint sm:flex-row sm:items-center sm:justify-between lg:px-8">
+          <span>AgentTrace · identity, control and proof for onchain agents on Monad</span>
+          <span className="flex gap-4">
+            <a className="hover:text-muted" href="https://github.com/catalystberry842-alt/AgentTrace" target="_blank" rel="noreferrer">GitHub ↗</a>
+            <a className="hover:text-muted" href={MONAD_TESTNET.explorerUrl} target="_blank" rel="noreferrer">Explorer ↗</a>
+            <Link className="hover:text-muted" to="/developers">Docs</Link>
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }
