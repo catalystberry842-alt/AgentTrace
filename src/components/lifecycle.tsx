@@ -4,7 +4,7 @@ export type StageState = "complete" | "current" | "later";
 
 export function Lifecycle({ stages }: { stages: Record<(typeof STAGES)[number], { state: StageState; detail: string }> }) {
   return (
-    <ol className="grid gap-6 sm:grid-cols-5" aria-label="Agent lifecycle">
+    <ol className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5" aria-label="Agent lifecycle">
       {STAGES.map((name) => {
         const stage = stages[name];
         const mark = stage.state === "complete" ? "✓" : stage.state === "current" ? "→" : "○";

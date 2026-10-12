@@ -74,12 +74,12 @@ function DevelopersPage() {
       </div>
 
       <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-        <section>
+        <section className="min-w-0">
           <h2 className="text-sm font-medium">Quickstart</h2>
           <p className="mt-2 text-sm text-muted">The agent keeps its own key and logic. AgentTrace only bounds and records the call.</p>
           <CodeBlock language="ts" code={SNIPPET} />
         </section>
-        <section>
+        <section className="min-w-0">
           <h2 className="text-sm font-medium">
             Contracts · {MONAD_TESTNET.label} · chain {MONAD_TESTNET.chainId}
           </h2>
