@@ -28,8 +28,8 @@ const SHOWCASE = IS_MAINNET
     };
 
 const EX = IS_MAINNET
-  ? { agent: "1", firewall: "1", proof: "0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e" }
-  : { agent: "6", firewall: "4", proof: "0x05eb59f6cf91d1ce47ece012c044e0df3f8a4205a1c33a962f7089d0c11fa030" };
+  ? { agent: "1", firewall: "1", erc: "1", proof: "0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e" }
+  : { agent: "13", firewall: "9", erc: "6", proof: "0xc9269fe97a92dadba1b32be0f755a88bb76f7fd3734260084940fa168cea030a" };
 
 const STEPS = [
   { title: "Identity", text: "A permanent agent id, owned by a wallet.", where: "AgentRegistry", detail: "registerAgent() mints a sequential agent id owned by the wallet that signed it. The passport shows owner, capabilities and the registration transaction.", href: `/agents/${EX.agent}`, cta: `Agent #${EX.agent.padStart(3, "0")}` },
@@ -37,7 +37,7 @@ const STEPS = [
   { title: "Execution", text: "The call runs only through the firewall.", where: "AgentAction event", detail: "execute() forwards the call and emits AgentAction with the execution id and calldata hash, so every action has one canonical onchain record.", href: `/agents/${EX.agent}/activity`, cta: "Agent activity" },
   { title: "Proof", text: "Receipt re-checked (14 checks), hash anchored onchain.", where: "AgentProof", detail: "AgentTrace re-reads the receipt, runs 14 checks, then anchors the proof hash in AgentProof. Anyone can rebuild it with the box below.", href: `/proofs/${EX.proof}`, cta: "A verified proof" },
   { title: "Outcome verdict", text: "Did the call achieve its purpose, not just succeed?", where: "Outcome adapters", detail: "An outcome adapter checks the protocol effect (e.g. the Deposited event and amount). What cannot be checked is unverifiable, never verified.", href: `/outcomes/${EX.proof}`, cta: "Its outcome" },
-  { title: "Publish", text: "Verdicts written where any wallet or agent reads them.", where: "ERC-8004 registries", detail: "Proof and outcome verdicts go to the canonical ERC-8004 Validation and Reputation registries on Monad, readable without trusting this site.", href: `/agents/${EX.agent}`, cta: "ERC-8004 record" },
+  { title: "Publish", text: "Verdicts written where any wallet or agent reads them.", where: "ERC-8004 registries", detail: "Proof and outcome verdicts go to the canonical ERC-8004 Validation and Reputation registries on Monad, readable without trusting this site.", href: `/agents/${EX.erc}`, cta: "ERC-8004 record" },
 ] as const;
 
 const TRUST = [
