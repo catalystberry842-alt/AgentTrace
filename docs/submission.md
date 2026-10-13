@@ -52,8 +52,8 @@ On testnet, earlier test runs registered agents #001–#005 and #007–#011 from
 - Outcome checks are event-based: WMON `Deposit`/`Withdrawal`, any ERC-20 `Transfer`/`Approval`, Demo Protocol, and `EVENT_EMITTED` for any contract; balance/state checks only for Demo Protocol.
 - One real protocol so far: canonical WMON (agent #003). The other examples target `DemoProtocol` (accounting only).
 - The original deployer wallet, which owns agents #001 and #002, is no longer accessible; their firewalls cannot be reconfigured. Their proofs stay anchored and verifiable.
-- Low outside usage: one outside wallet has registered agents.
-- Mainnet has five agents: #001 (ERC-8004 #10280), Treasury Agent #002 (MCP; not ERC-8004 linked), WMON Agent #003 (ERC-8004 #10315; owner and executor are one wallet), and Research Agents #004 and #005, registered through the live app by another wallet (`0x157e73ae…40f6`) on 7 October 2026 ([tx](https://monadvision.com/tx/0xa7ecc57e7709e62a8969209d66ea6783f2ec0a6d99ccfd7384efe2ab155886f2)) and 13 October 2026 ([tx](https://monadvision.com/tx/0x6ce414a0dee45c173ad21202aee35a759c1e2e613ff2cab88800a3c835cd991b)). Each has a firewall; #004 and #005 each made a Demo Protocol deposit that is receipt-verified and anchored.
+- No outside users yet: all five mainnet agents are run by the AgentTrace team.
+- Mainnet has five agents: #001 (ERC-8004 #10280), Treasury Agent #002 (MCP; not ERC-8004 linked), WMON Agent #003 (ERC-8004 #10315; owner and executor are one wallet), and Research Agents #004 and #005, registered through the live app by the project owner's personal wallet (`0x157e73ae…40f6`) on 7 October 2026 ([tx](https://monadvision.com/tx/0xa7ecc57e7709e62a8969209d66ea6783f2ec0a6d99ccfd7384efe2ab155886f2)) and 13 October 2026 ([tx](https://monadvision.com/tx/0x6ce414a0dee45c173ad21202aee35a759c1e2e613ff2cab88800a3c835cd991b)). Each has a firewall; #004 and #005 each made a Demo Protocol deposit that is receipt-verified and anchored. All five mainnet agents are run by the AgentTrace team; there are no outside users yet.
 
 ## Verified build
 
