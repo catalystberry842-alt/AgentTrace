@@ -43,7 +43,7 @@ Earlier test runs registered agents #001–#005 and #007–#011 from the same wa
 - Outcome checks: `EVENT_EMITTED` for any contract; balance/state checks only for Demo Protocol.
 - One real protocol so far: canonical WMON (agent #003). The other examples target `DemoProtocol` (accounting only). Built-in outcome adapters: WMON `deposit`/`transfer` and Demo Protocol.
 - Tokens a protocol sends to the caller land in the shared `AgentFirewall` contract, not a per-agent account, so agent #003 returns its WMON in the next call. A per-agent vault is on the roadmap.
-- Mainnet has three agents: #001 (ERC-8004 #10280), Treasury Agent #002 (MCP; not ERC-8004 linked), WMON Agent #003 (ERC-8004 #10315; owner and executor are one wallet).
+- Mainnet has four agents: #001 (ERC-8004 #10280), Treasury Agent #002 (MCP; not ERC-8004 linked), WMON Agent #003 (ERC-8004 #10315; owner and executor are one wallet), and Research Agent #004, registered through the live app on 7 October 2026 by another wallet (`0x157e73ae…40f6`, [tx](https://monadvision.com/tx/0xa7ecc57e7709e62a8969209d66ea6783f2ec0a6d99ccfd7384efe2ab155886f2)).
 - The deployed `AgentFirewall` (mainnet and testnet) checks target + selector + value, not argument values. Onchain argument caps exist in `AgentFirewallV2`, deployed on testnet only and not yet indexed by the app; on mainnet an amount cap is enforced off-chain by the SDK/MCP server (it stops a confused model, not a holder of the executor key who skips the SDK). Not audited.
 
 ## Verified build
