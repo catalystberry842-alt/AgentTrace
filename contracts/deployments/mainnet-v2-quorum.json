@@ -1,0 +1,134 @@
+{
+  "chainId": 143,
+  "network": "Monad mainnet",
+  "registry": "0xfa66d202dae4b7fb9aa5c6ee80390ca8bb48739e",
+  "wmon": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+  "agentId": "3",
+  "txs": {
+    "deployAgentFirewallV2": "0x79faa67cb8f06c6f66561eb9a543836d2857a341ce180ca7292539065db4fa21",
+    "deployAgentProofQuorum": "0x9592f2280ab313fd489abe421b88b43f49346e6e79357a4bf0f89c9e5df92df1",
+    "createFirewall": "0x38882fe61bb6fcb1b0106f02c339f4ea9d284312ad318f0d64aae7949de99342",
+    "allowTarget": "0xcc6a6d3a01b973ede935a32cb81d0c63781ecb6477bb325462956268bab8092c",
+    "allowFunction": "0xa36e82648e0d033a24b7f2416d838acbcba51b8d2080016c3bff8140ff566898",
+    "setArgCap": "0x7ee0082c270ec4681ab8e88f8c6a60015ef04397000e117a3a5e6071aac54ce5",
+    "executeApproveAllowed": "0x8f6042f2280cefddd7dc8d4d3c1615bddffbaa548de276226276dbe5a6ab0acb",
+    "executeApproveOverCap": "0x0d4b47c32fe3541a5758ec3c28e8736f949a1b38b28c54796faa9284faba3c32",
+    "fundVerifierA": "0x26d29ee15e679bb6eb07137fd82f33c9208500fc901b011c8a1b4baf9cccb786",
+    "fundVerifierB": "0x471b81264cae3ad8af3e66b2fcde5d4c40421f8a7cee6d04caa8c378fd79443d",
+    "attestVerifierA": "0xef6aa20565e00539e164986a13574aae3f54d75fdfc56a0512d3182d1a0f689b",
+    "attestVerifierB": "0x5386516093a4d1a9d760bf322a0b57232612762ff2f23b245ba6f25884148ada"
+  },
+  "gas": {
+    "deployAgentFirewallV2": {
+      "limit": "2096504",
+      "used": "2096504",
+      "price": "102000000000",
+      "status": "success",
+      "block": "112999728"
+    },
+    "deployAgentProofQuorum": {
+      "limit": "1171624",
+      "used": "1171624",
+      "price": "102000000000",
+      "status": "success",
+      "block": "112999735"
+    },
+    "createFirewall": {
+      "limit": "283241",
+      "used": "283241",
+      "price": "102000000000",
+      "status": "success",
+      "block": "112999741"
+    },
+    "allowTarget": {
+      "limit": "140395",
+      "used": "140395",
+      "price": "102000000000",
+      "status": "success",
+      "block": "112999747"
+    },
+    "allowFunction": {
+      "limit": "129228",
+      "used": "129228",
+      "price": "102000000000",
+      "status": "success",
+      "block": "112999753"
+    },
+    "setArgCap": {
+      "limit": "149897",
+      "used": "149897",
+      "price": "102000000000",
+      "status": "success",
+      "block": "112999760"
+    },
+    "executeApproveAllowed": {
+      "limit": "191316",
+      "used": "191316",
+      "price": "102000000000",
+      "status": "success",
+      "block": "112999769"
+    },
+    "executeApproveOverCap": {
+      "limit": "120000",
+      "used": "120000",
+      "price": "102000000000",
+      "status": "reverted",
+      "block": "112999774"
+    },
+    "fundVerifierA": {
+      "limit": "24339",
+      "used": "24339",
+      "price": "102000000000",
+      "status": "success",
+      "block": "112999789"
+    },
+    "fundVerifierB": {
+      "limit": "24339",
+      "used": "24339",
+      "price": "102000000000",
+      "status": "success",
+      "block": "112999802"
+    },
+    "attestVerifierA": {
+      "limit": "248697",
+      "used": "248697",
+      "price": "102000000000",
+      "status": "success",
+      "block": "112999908"
+    },
+    "attestVerifierB": {
+      "limit": "110178",
+      "used": "110178",
+      "price": "102000000000",
+      "status": "success",
+      "block": "112999916"
+    }
+  },
+  "startBalance": "756670534000000000",
+  "agentFirewallV2": "0xf1b0365586d1867133c991046e2fd3006efe16e5",
+  "agentProofQuorum": "0x21aa1604030b413c02f0f69304179f77bcd6adf6",
+  "verifiers": [
+    "0x45e2F5c46b401280a2e5531d3C48bc9a3F3453fE",
+    "0x1C132643e8237332EdF9F8377dD192488453e5d1"
+  ],
+  "threshold": 2,
+  "firewallId": "1",
+  "allowed": {
+    "amountWei": "500000000000000",
+    "executionId": "0x33d24a64f6b06333222fbf191af0fe2c5d0f6d7c62f037a3e6fc3bae8fda8a73",
+    "approvalWad": "500000000000000"
+  },
+  "rejected": {
+    "amountWei": "5000000000000000",
+    "capWei": "1000000000000000",
+    "sent": true,
+    "status": "reverted",
+    "revertData": "0x22847f26\u2026",
+    "error": "ArgumentTooHigh(1, 0x095ea7b3, 1, 5000000000000000, 1000000000000000)",
+    "decodedBy": "eth_call replay at block-1"
+  },
+  "quorumProofHash": "0x4ee73e939582984e1f1d3833082be5392e764cef84314dd45939b615b4fc5e8f",
+  "quorumAnchored": true,
+  "opsSpentWei": "515866203600000000",
+  "opsSpentMON": "0.5158662036"
+}

@@ -8,6 +8,7 @@ import { publishDeveloperEvent } from "@/lib/developer/webhooks.server";
 import { configuredDemoProtocol } from "@/lib/chain/addresses.server";
 import { configuredFirewall } from "@/lib/chain/firewall.server";
 import { cachedOutcomeRequests, recordOutcomeRequest } from "@/lib/chain/chain-cache.server";
+import { deriveProtocolExpectation, SELECTORS } from "@/lib/developer/protocol-outcomes";
 
 const SIGNATURE = /^[A-Za-z_][A-Za-z0-9_]*\(([A-Za-z0-9]+)(,[A-Za-z0-9]+)*\)$/;
 const OPERATORS = new Set([">=", "<=", ">", "<", "==", "!="]);
@@ -541,9 +542,6 @@ export const WMON_BY_CHAIN: Record<number, `0x${string}`> = {
   143: "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
 };
 
-const WMON_DEPOSIT = "0xd0e30db0";
-const WMON_TRANSFER = "0xa9059cbb";
-const wmonAbi = parseAbi(["function deposit() payable", "function transfer(address dst, uint256 wad) returns (bool)"]);
 const executeAbi = parseAbi(["function execute(uint256 firewallId, address target, uint256 value, bytes data) payable"]);
 
 type ProtocolActionRow = ActionRow & { selector: string; value: string; calldata_hash: string };
@@ -551,8 +549,9 @@ type ProtocolActionRow = ActionRow & { selector: string; value: string; calldata
 /**
  * Outcome for a call to a known protocol. As with the demo deposit, the expectation is derived
  * here from the execution itself (target, selector, value, calldata), never supplied by the caller,
- * so anyone may trigger it and the verdict is the same. Supported today: WMON deposit() and
- * transfer(address,uint256) on Monad mainnet; the proof is the WMON event in the receipt.
+ * so anyone may trigger it and the verdict is the same. Supported today (see protocol-outcomes.ts):
+ * WMON deposit()/withdraw(uint256) and any ERC-20 transfer/approve/transferFrom; the proof is the
+ * Deposit/Withdrawal/Transfer/Approval event in the receipt.
  */
 export async function verifyProtocolOutcome(executionId: string): Promise<Response> {
   if (!/^0x[a-fA-F0-9]{64}$/.test(executionId)) {
@@ -568,48 +567,24 @@ export async function verifyProtocolOutcome(executionId: string): Promise<Respon
   if (!action) return apiError(404, "EXECUTION_NOT_FOUND", "No indexed execution has that id. Nothing was marked verified.");
   const wmon = WMON_BY_CHAIN[MONAD_TESTNET.chainId];
   const firewall = configuredFirewall();
-  if (!wmon || !firewall || action.target.toLowerCase() !== wmon) {
+  if (!firewall) {
     return apiError(400, "OUTCOME_UNSUPPORTED", "No built-in outcome adapter for this target. No outcome was recorded.");
   }
   const selector = action.selector.toLowerCase();
-  // WMON credits msg.sender, which is the AgentFirewall contract that made the call.
+  // WMON and ERC-20 tokens credit msg.sender, which is the AgentFirewall contract that made the call.
   const caller = getAddress(firewall);
-  if (selector === WMON_DEPOSIT) {
-    return verifyOutcome(id, {
-      expectation: {
-        type: "EVENT_EMITTED",
-        event: "Deposit",
-        eventSignature: "Deposit(address,uint256)",
-        conditions: { arg0: { operator: "==", value: caller }, arg1: { operator: "==", value: String(BigInt(action.value)) } },
-      },
-    });
-  }
-  if (selector === WMON_TRANSFER) {
-    let dst: string;
-    let wad: bigint;
+  let data: Hex | undefined;
+  if (selector !== SELECTORS.deposit) {
     try {
       const tx = await getPublicClient().getTransaction({ hash: action.tx_hash as Hex });
       const call = decodeFunctionData({ abi: executeAbi, data: tx.input });
-      const data = call.args[3];
+      data = call.args[3];
       if (keccak256(data).toLowerCase() !== action.calldata_hash.toLowerCase()) throw new Error("calldata hash mismatch");
-      const inner = decodeFunctionData({ abi: wmonAbi, data });
-      if (inner.functionName !== "transfer") throw new Error("not transfer");
-      [dst, wad] = [getAddress(inner.args[0]), inner.args[1]];
     } catch {
-      return apiError(409, "OUTCOME_UNSUPPORTED", "The transfer calldata could not be read from the transaction. No outcome was recorded.");
+      return apiError(409, "OUTCOME_UNSUPPORTED", "The call's calldata could not be read from the transaction. No outcome was recorded.");
     }
-    return verifyOutcome(id, {
-      expectation: {
-        type: "EVENT_EMITTED",
-        event: "Transfer",
-        eventSignature: "Transfer(address,address,uint256)",
-        conditions: {
-          arg0: { operator: "==", value: caller },
-          arg1: { operator: "==", value: dst },
-          arg2: { operator: "==", value: wad.toString() },
-        },
-      },
-    });
   }
-  return apiError(400, "OUTCOME_UNSUPPORTED", "No built-in outcome adapter for this WMON function. No outcome was recorded.");
+  const derived = deriveProtocolExpectation({ target: action.target, selector, value: BigInt(action.value), data, caller, wmon });
+  if (derived.ok) return verifyOutcome(id, { expectation: derived.expectation });
+  return apiError(400, "OUTCOME_UNSUPPORTED", `${derived.reason} No outcome was recorded.`);
 }
