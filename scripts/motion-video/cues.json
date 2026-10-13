@@ -1,0 +1,436 @@
+{
+"vo": [
+1.6,
+9.7,
+29.6,
+46.6,
+67.8
+],
+"sfx": [
+[
+0.6,
+"dot appears",
+"start"
+],
+[
+4.55,
+"withdraw call launches",
+"peak"
+],
+[
+8.4,
+"riser into firewall",
+"peak"
+],
+[
+8.4,
+"LOCK: FunctionNotAllowed",
+"peak"
+],
+[
+8.4,
+"gate field",
+"start"
+],
+[
+15.1,
+"deposit passes firewall",
+"peak"
+],
+[
+15.1,
+"gate lights",
+"start"
+],
+[
+16.97,
+"receipt row 1",
+"start"
+],
+[
+18.03,
+"receipt row 2",
+"start"
+],
+[
+19.19,
+"receipt row 3",
+"start"
+],
+[
+20.44,
+"receipt row 4",
+"start"
+],
+[
+21.8,
+"receipt row 5",
+"start"
+],
+[
+23.27,
+"receipt row 6",
+"start"
+],
+[
+24.85,
+"receipt row 7",
+"start"
+],
+[
+31.6,
+"hash riser",
+"peak"
+],
+[
+28.32,
+"hash chars",
+"start"
+],
+[
+28.57,
+"hash chars",
+"start"
+],
+[
+28.78,
+"hash chars",
+"start"
+],
+[
+29.02,
+"hash chars",
+"start"
+],
+[
+29.24,
+"hash chars",
+"start"
+],
+[
+29.41,
+"hash chars",
+"start"
+],
+[
+29.62,
+"hash chars",
+"start"
+],
+[
+29.92,
+"hash chars",
+"start"
+],
+[
+30.09,
+"hash chars",
+"start"
+],
+[
+30.3,
+"hash chars",
+"start"
+],
+[
+30.6,
+"hash chars",
+"start"
+],
+[
+30.77,
+"hash chars",
+"start"
+],
+[
+31.02,
+"hash chars",
+"start"
+],
+[
+31.21,
+"hash chars",
+"start"
+],
+[
+31.6,
+"proofHash settles",
+"start"
+],
+[
+34.6,
+"hash collapses into trace",
+"peak"
+],
+[
+37.3,
+"block tile 163",
+"start"
+],
+[
+37.7,
+"block tile 164",
+"start"
+],
+[
+38.1,
+"block tile 165",
+"start"
+],
+[
+38.5,
+"block tile 166",
+"start"
+],
+[
+38.9,
+"block tile 167",
+"start"
+],
+[
+39.3,
+"block tile 168",
+"start"
+],
+[
+39.7,
+"block tile 169",
+"start"
+],
+[
+40.1,
+"block tile 170",
+"start"
+],
+[
+38.9,
+"riser into anchor",
+"peak"
+],
+[
+38.9,
+"SUB HIT: anchorProof",
+"peak"
+],
+[
+43.0,
+"rise to ERC-8004",
+"peak"
+],
+[
+45.94,
+"validationResponse written",
+"start"
+],
+[
+48.54,
+"giveFeedback written",
+"start"
+],
+[
+56.0,
+"pull back reveal",
+"peak"
+],
+[
+60.6,
+"push into live site",
+"peak"
+],
+[
+61,
+"id typing",
+"start"
+],
+[
+61.08,
+"id typing",
+"start"
+],
+[
+61.15,
+"id typing",
+"start"
+],
+[
+61.23,
+"id typing",
+"start"
+],
+[
+61.3,
+"id typing",
+"start"
+],
+[
+61.38,
+"id typing",
+"start"
+],
+[
+61.45,
+"id typing",
+"start"
+],
+[
+61.53,
+"id typing",
+"start"
+],
+[
+61.6,
+"id typing",
+"start"
+],
+[
+61.68,
+"id typing",
+"start"
+],
+[
+61.75,
+"id typing",
+"start"
+],
+[
+61.83,
+"id typing",
+"start"
+],
+[
+61.9,
+"id typing",
+"start"
+],
+[
+61.98,
+"id typing",
+"start"
+],
+[
+62.05,
+"id typing",
+"start"
+],
+[
+62.13,
+"id typing",
+"start"
+],
+[
+62.2,
+"id typing",
+"start"
+],
+[
+62.28,
+"id typing",
+"start"
+],
+[
+62.35,
+"id typing",
+"start"
+],
+[
+62.43,
+"id typing",
+"start"
+],
+[
+62.5,
+"id typing",
+"start"
+],
+[
+62.58,
+"id typing",
+"start"
+],
+[
+63.05,
+"Verify click",
+"start"
+],
+[
+63.4,
+"PASS",
+"start"
+],
+[
+63.35,
+"checks reveal",
+"start"
+],
+[
+63.49,
+"checks reveal",
+"start"
+],
+[
+63.63,
+"checks reveal",
+"start"
+],
+[
+63.77,
+"checks reveal",
+"start"
+],
+[
+63.91,
+"checks reveal",
+"start"
+],
+[
+64.05,
+"checks reveal",
+"start"
+],
+[
+64.19,
+"checks reveal",
+"start"
+],
+[
+64.33,
+"checks reveal",
+"start"
+],
+[
+64.47,
+"checks reveal",
+"start"
+],
+[
+64.61,
+"checks reveal",
+"start"
+],
+[
+64.75,
+"checks reveal",
+"start"
+],
+[
+66.3,
+"dissolve",
+"peak"
+],
+[
+67.6,
+"logo forms",
+"peak"
+],
+[
+67.7,
+"logo stroke",
+"start"
+],
+[
+67.3,
+"dot becomes logo",
+"start"
+]
+]
+}

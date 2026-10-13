@@ -18,7 +18,7 @@ Around that verdict sit the facts it depends on: an onchain **identity** (`Agent
 | --- | --- |
 | Live app, mainnet (chain 143) | https://agenttrace-mainnet.vercel.app |
 | Live app, testnet (chain 10143) | https://agenttrace-plum.vercel.app |
-| Motion demo (98 s, 1080p, narrated + captions, SFX) | [docs/agenttrace-motion.mp4](docs/agenttrace-motion.mp4) |
+| Motion film (73 s, 1080p60, one continuous shot) | [docs/agenttrace-motion.mp4](docs/agenttrace-motion.mp4) |
 | Short demo video (about 90 s, opens with a blocked call) | [docs/demo-short.mp4](docs/demo-short.mp4) |
 | Full demo video (narrated, about 2 min 50 s, recorded on mainnet) | [docs/demo.mp4](docs/demo.mp4) |
 | Submission notes | [docs/submission.md](docs/submission.md) |
