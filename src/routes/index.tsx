@@ -5,6 +5,7 @@ import type { ProofRecord, RegistrationIntent } from "@/lib/agents/types";
 import { GROK_PROVIDERS, authEnabled, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Shell } from "@/components/shell";
+import { LiveDot, LiveStatsStrip, StepExplorer, VerifyBox, usePolling } from "@/components/landing-live";
 import { buttonClass, EmptyState, ErrorNote, Mono, SkeletonLines, StatusText } from "@/components/ui";
 import { formatAgentId, formatUtc, functionName, proofStatusLabel, statusLabel, statusTone } from "@/lib/format";
 import { IS_MAINNET, MONAD_TESTNET } from "@/lib/chain/network";
@@ -26,13 +27,17 @@ const SHOWCASE = IS_MAINNET
       agentProof: "0x05eb59f6cf91d1ce47ece012c044e0df3f8a4205a1c33a962f7089d0c11fa030",
     };
 
+const EX = IS_MAINNET
+  ? { agent: "1", firewall: "1", proof: "0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e" }
+  : { agent: "6", firewall: "4", proof: "0x05eb59f6cf91d1ce47ece012c044e0df3f8a4205a1c33a962f7089d0c11fa030" };
+
 const STEPS = [
-  { title: "Identity", text: "A permanent agent id, owned by a wallet.", where: "AgentRegistry" },
-  { title: "Control", text: "Allowed contracts, functions, and value.", where: "AgentFirewall" },
-  { title: "Execution", text: "The call runs only through the firewall.", where: "AgentAction event" },
-  { title: "Proof", text: "Receipt re-checked (14 checks), hash anchored onchain.", where: "AgentProof" },
-  { title: "Outcome verdict", text: "Did the call achieve its purpose, not just succeed?", where: "Outcome adapters" },
-  { title: "Publish", text: "Verdicts written where any wallet or agent reads them.", where: "ERC-8004 registries" },
+  { title: "Identity", text: "A permanent agent id, owned by a wallet.", where: "AgentRegistry", detail: "registerAgent() mints a sequential agent id owned by the wallet that signed it. The passport shows owner, capabilities and the registration transaction.", href: `/agents/${EX.agent}`, cta: `Agent #${EX.agent.padStart(3, "0")}` },
+  { title: "Control", text: "Allowed contracts, functions, and value.", where: "AgentFirewall", detail: "The firewall holds the allow-list of targets and 4-byte selectors plus value caps. Anything else reverts before it reaches the target.", href: `/firewalls/${EX.firewall}`, cta: `Firewall #${EX.firewall.padStart(3, "0")}` },
+  { title: "Execution", text: "The call runs only through the firewall.", where: "AgentAction event", detail: "execute() forwards the call and emits AgentAction with the execution id and calldata hash, so every action has one canonical onchain record.", href: `/agents/${EX.agent}/activity`, cta: "Agent activity" },
+  { title: "Proof", text: "Receipt re-checked (14 checks), hash anchored onchain.", where: "AgentProof", detail: "AgentTrace re-reads the receipt, runs 14 checks, then anchors the proof hash in AgentProof. Anyone can rebuild it with the box below.", href: `/proofs/${EX.proof}`, cta: "A verified proof" },
+  { title: "Outcome verdict", text: "Did the call achieve its purpose, not just succeed?", where: "Outcome adapters", detail: "An outcome adapter checks the protocol effect (e.g. the Deposited event and amount). What cannot be checked is unverifiable, never verified.", href: `/outcomes/${EX.proof}`, cta: "Its outcome" },
+  { title: "Publish", text: "Verdicts written where any wallet or agent reads them.", where: "ERC-8004 registries", detail: "Proof and outcome verdicts go to the canonical ERC-8004 Validation and Reputation registries on Monad, readable without trusting this site.", href: `/agents/${EX.agent}`, cta: "ERC-8004 record" },
 ] as const;
 
 const TRUST = [
@@ -229,20 +234,17 @@ function Landing({ pending }: { pending: boolean }) {
         <RecentProofs />
       </section>
 
+      <LiveStatsStrip />
+
+      <div className="mt-6">
+        <VerifyBox example={EX.proof} />
+      </div>
+
       <section className="mt-16 border-t border-border pt-8" aria-labelledby="how">
         <h2 id="how" className="text-sm font-medium">
           How one agent action is checked
         </h2>
-        <ol className="mt-5 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3 lg:grid-cols-6">
-          {STEPS.map((step, index) => (
-            <li key={step.title} className="flex flex-col bg-bg p-5">
-              <span className="font-mono text-xs text-accent">{String(index + 1).padStart(2, "0")}</span>
-              <span className="mt-3 text-sm font-medium">{step.title}</span>
-              <span className="mt-1 flex-1 text-sm text-muted">{step.text}</span>
-              <span className="type-technical mt-4 text-xs text-faint">{step.where}</span>
-            </li>
-          ))}
-        </ol>
+        <StepExplorer steps={STEPS} />
       </section>
 
       <section className="mt-14 grid gap-10 border-t border-border pt-8 lg:grid-cols-[1fr_1.1fr] lg:gap-16" aria-labelledby="any-agent">
@@ -338,26 +340,22 @@ function Landing({ pending }: { pending: boolean }) {
   );
 }
 
+const loadProofs = () => listProofs();
+
 function RecentProofs() {
   const [proofs, setProofs] = useState<ProofRecord[] | null>(null);
   const [error, setError] = useState(false);
+  const live = usePolling(loadProofs, 15_000);
   useEffect(() => {
-    let cancelled = false;
-    listProofs()
-      .then((result) => {
-        if (!cancelled) setProofs(result.proofs.slice(0, 6));
-      })
-      .catch(() => {
-        if (!cancelled) setError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (live.data) setProofs(live.data.proofs.slice(0, 6));
+    if (live.error && !live.data) setError(true);
+  }, [live.data, live.error]);
   return (
     <div className="min-w-0 self-start rounded-lg border border-border bg-surface">
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 className="text-sm font-medium">Latest executions</h2>
+        <h2 className="flex items-center gap-3 text-sm font-medium">
+          Latest executions <LiveDot />
+        </h2>
         <Link to="/proofs" className="text-xs text-muted hover:text-fg">
           All proofs →
         </Link>
