@@ -1,0 +1,261 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#0a0a0c;--surf:#111113;--el:#18181b;--fg:#f4f4f5;--mut:#a1a1aa;--faint:#71717a;--bd:#27272a;--acc:#836ef9;--ok:#8eae96;--err:#c47a74}
+*{box-sizing:border-box;margin:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--fg);font-family:"Instrument Sans",sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+#stage{position:absolute;inset:0;overflow:hidden}
+.bggrid{position:absolute;inset:-40px;background-image:linear-gradient(#ffffff06 1px,transparent 1px),linear-gradient(90deg,#ffffff06 1px,transparent 1px);background-size:80px 80px}
+.glow{position:absolute;width:1400px;height:1400px;border-radius:50%;background:radial-gradient(circle,#836ef91c 0%,#836ef908 35%,transparent 65%);left:260px;top:-300px}
+.vign{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,#00000090 100%)}
+.scene{position:absolute;inset:0;opacity:0}
+.eyebrow{font-family:"IBM Plex Mono";font-size:20px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase}
+.eyebrow b{color:var(--acc);font-weight:500}
+h1{font-weight:600;letter-spacing:-.03em;line-height:1.02}
+.card{background:var(--surf);border:1px solid var(--bd);border-radius:16px}
+#cap{position:absolute;left:0;right:0;bottom:46px;display:flex;justify-content:center;pointer-events:none}
+#cap span{font-size:33px;font-weight:500;line-height:1.3;color:var(--fg);background:#0a0a0cd9;border:1px solid #27272a;padding:12px 26px;border-radius:12px;max-width:1400px;text-align:center;letter-spacing:-.005em}
+/* pipeline */
+.node{position:absolute;top:330px;width:258px;height:300px;padding:26px 24px}
+.node .n{font-family:"IBM Plex Mono";font-size:18px;color:var(--faint)}
+.node .t{font-size:34px;font-weight:600;margin-top:14px;letter-spacing:-.02em}
+.node .c{font-family:"IBM Plex Mono";font-size:17px;color:var(--mut);margin-top:6px}
+.node .d{font-family:"IBM Plex Mono";font-size:17px;color:var(--fg);margin-top:26px;line-height:1.65;white-space:pre}
+.node .d i{font-style:normal;color:var(--faint)}
+.dot{position:absolute;width:14px;height:14px;border-radius:50%;top:323px;border:2px solid var(--bd);background:var(--bg)}
+.browser{position:absolute;left:210px;top:48px;width:1500px;height:822px;border-radius:14px;overflow:hidden;border:1px solid #2f2f35;background:var(--bg);box-shadow:0 40px 120px #000a}
+.bbar{height:46px;background:#111113;border-bottom:1px solid var(--bd);display:flex;align-items:center;padding:0 18px;gap:9px}
+.bbar i{width:12px;height:12px;border-radius:50%;background:#2a2a2f;display:block}
+.url{margin-left:22px;font-family:"IBM Plex Mono";font-size:17px;color:var(--mut);background:#0a0a0c;border:1px solid var(--bd);border-radius:8px;padding:6px 14px;width:900px}
+.url b{color:var(--fg);font-weight:400}
+.vp{position:absolute;left:0;top:46px;width:1500px;height:776px;overflow:hidden}
+.shot{position:absolute;left:0;top:0;transform-origin:0 0;opacity:0}
+.ring{position:absolute;border:2px solid var(--acc);border-radius:10px;box-shadow:0 0 0 6px #836ef922,0 0 40px #836ef955;opacity:0}
+.cursor{position:absolute;width:26px;height:26px;opacity:0}
+pre.code{font-family:"IBM Plex Mono";font-size:25px;line-height:1.62;color:var(--fg);white-space:pre}
+.k{color:var(--acc)}.s{color:#c9c2fb}.cm{color:var(--faint)}
+.big{font-size:118px;font-weight:600;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.lbl{font-family:"IBM Plex Mono";font-size:20px;color:var(--mut);margin-top:10px}
+</style></head><body><div id="stage">
+<div class="bggrid" id="grid"></div><div class="glow" id="glow"></div>
+
+<!-- 1 intro -->
+<div class="scene" id="s-intro">
+ <div id="logo" style="position:absolute;left:50%;top:330px;width:150px;height:150px;margin-left:-75px">
+  <svg viewBox="0 0 32 32" width="150" height="150" fill="none">
+   <rect id="lrect" width="32" height="32" rx="8" fill="#836EF9"/>
+   <path id="lp1" d="M8 24.5 L16 7.5 L21.2 18.6" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+   <path id="lp2" d="M11.4 18.5 H16.5" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+   <circle id="lc" cx="23.2" cy="22.8" r="2.6" stroke="#fff" stroke-width="2.2"/>
+  </svg></div>
+ <div id="wm" style="position:absolute;top:510px;width:100%;text-align:center;font-size:64px;font-weight:600;letter-spacing:-.03em">AgentTrace</div>
+ <div id="tag" style="position:absolute;top:610px;width:100%;text-align:center;font-size:40px;color:var(--mut);letter-spacing:-.01em">Every agent leaves a trace.</div>
+ <div id="intro-eb" class="eyebrow" style="position:absolute;top:262px;width:100%;text-align:center"><b>●</b>&nbsp; Live on Monad mainnet · chain 143</div>
+</div>
+
+<!-- 2 problem -->
+<div class="scene" id="s-problem">
+ <div style="position:absolute;left:180px;top:300px">
+  <div class="eyebrow">The problem</div>
+  <h1 id="p1" style="font-size:104px;margin-top:28px">Agents act.</h1>
+  <h1 id="p2" style="font-size:104px;color:var(--faint)">Nobody can check.</h1>
+ </div>
+ <div id="plog" class="mono" style="position:absolute;left:1080px;top:250px;width:680px;font-size:20px;line-height:2.5"></div>
+</div>
+
+<!-- 3 blocked -->
+<div class="scene" id="s-blocked">
+ <div class="eyebrow" style="position:absolute;left:210px;top:120px">Monad mainnet · Treasury Agent #002 · MCP session</div>
+ <div class="card" id="term" style="position:absolute;left:210px;top:180px;width:1500px;height:560px;padding:40px 48px">
+  <div class="mono" style="font-size:24px;color:var(--faint)">tools/call</div>
+  <div class="mono" id="cmd" style="font-size:36px;margin-top:10px;white-space:pre"></div>
+  <div id="rej" style="opacity:0;margin-top:46px">
+   <div class="mono" style="font-size:24px;color:var(--err);letter-spacing:.06em">✕ FIREWALL_REJECTED</div>
+   <div class="mono" style="font-size:27px;margin-top:20px;line-height:1.6;color:var(--fg)">AgentFirewall reverted with<br><span style="color:var(--err)">FunctionNotAllowed</span><span style="color:var(--mut)">(2, 0x1664Be58…11C3, 0x441a3e70)</span></div>
+   <div style="font-size:40px;font-weight:600;margin-top:34px;letter-spacing:-.02em">Nothing was sent.</div>
+  </div>
+ </div>
+ <div id="others" style="position:absolute;left:210px;top:772px;width:1500px;display:flex;gap:24px">
+  <div class="card ob" style="flex:1;padding:22px 28px"><div class="mono" style="font-size:16px;color:var(--faint)">WMON AGENT #003 · DEPOSIT 0.03 MON</div><div class="mono" style="font-size:22px;margin-top:10px"><span style="color:var(--err)">TransactionValueTooHigh</span><span style="color:var(--mut)">(3, 3e16)</span></div></div>
+  <div class="card ob" style="flex:1;padding:22px 28px"><div class="mono" style="font-size:16px;color:var(--faint)">WMON AGENT #003 · TRANSFER 1 WMON</div><div class="mono" style="font-size:22px;margin-top:10px"><span style="color:var(--err)">POLICY_REJECTED</span><span style="color:var(--mut)"> · off-chain cap</span></div></div>
+  <div class="card ob" style="flex:1;padding:22px 28px"><div class="mono" style="font-size:16px;color:var(--faint)">WMON AGENT #003 · WITHDRAW</div><div class="mono" style="font-size:22px;margin-top:10px"><span style="color:var(--err)">FunctionNotAllowed</span><span style="color:var(--mut)">(3, …, 0x2e1a7d4d)</span></div></div>
+ </div>
+</div>
+
+<!-- 4 pipeline -->
+<div class="scene" id="s-pipeline">
+ <div style="position:absolute;left:150px;top:150px"><div class="eyebrow">How one agent action is checked · <b>WMON Agent #003</b></div>
+ <h1 style="font-size:64px;margin-top:20px">One path, every action.</h1></div>
+ <div id="track" style="position:absolute;left:150px;top:329px;width:1620px;height:2px;background:var(--bd)"></div>
+ <div id="trackf" style="position:absolute;left:150px;top:329px;width:0;height:2px;background:var(--acc);box-shadow:0 0 14px #836ef9"></div>
+ <div id="nodes"></div>
+ <div id="phash" class="mono" style="position:absolute;left:150px;top:720px;width:1620px;font-size:22px;color:var(--mut)"></div>
+</div>
+
+<!-- 5 live -->
+<div class="scene" id="s-live">
+ <div class="browser"><div class="bbar"><i></i><i></i><i></i><div class="url" id="url"></div></div>
+  <div class="vp" id="vp">
+   <img class="shot" id="sh-hero" src="cap/hero.png">
+   <img class="shot" id="sh-fw" src="cap/fw3.png">
+   <img class="shot" id="sh-out" src="cap/outcome.png">
+   <div class="ring" id="ring"></div>
+  </div></div>
+</div>
+
+<!-- 6 verify -->
+<div class="scene" id="s-verify">
+ <div class="eyebrow" style="position:absolute;left:150px;top:64px">agenttrace-mainnet.vercel.app · <b>Verify a proof yourself</b></div>
+ <div id="vwrap" style="position:absolute;left:150px;top:112px;width:1620px;height:633px;overflow:hidden;border-radius:16px;border:1px solid #2f2f35">
+  <img id="vimg" src="cap/landing-post.png" style="position:absolute;transform-origin:0 0">
+  <div id="vtypemask" style="position:absolute;background:#0a0a0c"></div>
+  <div id="vresmask" style="position:absolute;left:0;right:0;bottom:0;background:#111113"></div>
+  <div class="ring" id="vring"></div>
+  <svg class="cursor" id="cur" viewBox="0 0 24 24"><path d="M4 2 L4 19 L8.5 14.8 L11.6 21.5 L14.4 20.3 L11.4 13.8 L17.5 13.6 Z" fill="#fff" stroke="#0a0a0c" stroke-width="1.2"/></svg>
+ </div>
+</div>
+
+<!-- 7 sdk -->
+<div class="scene" id="s-sdk">
+ <div style="position:absolute;left:150px;top:150px"><div class="eyebrow">For builders · SDK + MCP</div><h1 style="font-size:64px;margin-top:20px">One install. One call.</h1></div>
+ <div class="card" style="position:absolute;left:150px;top:350px;width:760px;height:120px;padding:0 36px;display:flex;align-items:center"><pre class="code" id="npm"></pre></div>
+ <div class="card" style="position:absolute;left:150px;top:500px;width:760px;padding:30px 36px"><div class="mono" style="font-size:18px;color:var(--faint)">published on npm</div><div class="mono" style="font-size:30px;margin-top:8px">agenttrace-monad</div>
+  <div class="mono" style="font-size:18px;color:var(--faint);margin-top:26px">also ships as</div><div class="mono" style="font-size:24px;margin-top:8px">MCP server · Claude · Cursor</div></div>
+ <div class="card" id="codecard" style="position:absolute;left:960px;top:350px;width:810px;height:520px;padding:34px 40px"><pre class="code" id="code"></pre></div>
+</div>
+
+<!-- 8 monad -->
+<div class="scene" id="s-monad">
+ <div style="position:absolute;left:150px;top:130px"><div class="eyebrow">Why Monad · measured on mainnet</div><h1 style="font-size:64px;margin-top:20px">Verification at chain speed.</h1></div>
+ <div id="m1" style="position:absolute;left:150px;top:330px"><div class="big" id="n1">0</div><div class="lbl">gas · AgentProof.anchorProof</div></div>
+ <div id="m2" style="position:absolute;left:760px;top:330px"><div class="big" id="n2">0</div><div class="lbl">gas · AgentFirewall.execute</div></div>
+ <div id="m3" style="position:absolute;left:1340px;top:330px"><div class="big"><span id="n3">0</span><span style="font-size:60px;color:var(--mut)"> ms</span></div><div class="lbl">finality · 2 blocks</div></div>
+ <div id="strip" class="card" style="position:absolute;left:150px;top:620px;width:1620px;height:150px;display:flex">
+ </div>
+ <div id="stripnote" class="mono" style="position:absolute;left:150px;top:790px;font-size:17px;color:var(--faint)"></div>
+</div>
+
+<!-- 9 close -->
+<div class="scene" id="s-close">
+ <div style="position:absolute;top:250px;width:100%;display:flex;justify-content:center"><img src="agenttrace-mark.svg" width="120" height="120"></div>
+ <div style="position:absolute;top:400px;width:100%;text-align:center;font-size:72px;font-weight:600;letter-spacing:-.03em">AgentTrace</div>
+ <div style="position:absolute;top:500px;width:100%;text-align:center;font-size:38px;color:var(--mut)">Every agent leaves a trace.</div>
+ <div id="cl" class="mono" style="position:absolute;top:610px;width:100%;text-align:center;font-size:24px;line-height:2;color:var(--fg)">
+  <div class="cl">agenttrace-mainnet.vercel.app</div>
+  <div class="cl" style="color:var(--mut)">github.com/catalystberry842-alt/AgentTrace</div>
+  <div class="cl" style="color:var(--mut)">npm install agenttrace-monad viem</div>
+  <div class="cl eyebrow" style="margin-top:20px;font-size:19px">Monad Metropolis · <b>Track 04</b> · Trust, Identity &amp; AI</div>
+ </div>
+</div>
+
+<div class="vign"></div>
+<div id="cap"><span id="capt" style="opacity:0"></span></div>
+</div>
+<script src="data.js"></script>
+<script>
+const TL=window.TL, ST=window.STATS;
+const C=(x)=>Math.max(0,Math.min(1,x)), seg=(t,a,b)=>C((t-a)/(b-a));
+const eo=(x)=>1-Math.pow(1-x,3), eio=(x)=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const $=(id)=>document.getElementById(id);
+const sc={};TL.scenes.forEach(s=>sc[s.id]=s);
+const cuesIn=(id)=>TL.cues.filter(c=>c.s>=sc[id].start&&c.s<sc[id].start+sc[id].dur).map(c=>c.s-sc[id].start);
+const type=(str,p)=>str.slice(0,Math.round(str.length*C(p)));
+const fadeUp=(el,p,dy=24)=>{p=eo(C(p));el.style.opacity=p;el.style.transform=`translateY(${(1-p)*dy}px)`};
+// problem log: real mainnet executions
+const ex=["0x52c98d50…4c6d5e","0x734c1c3d…dc3bb8","0x8361810c…6ab798","0x30985cb6…4a9552","0x55b2e18f…ed1862","0xb5cb012e…a1226d"];
+$("plog").innerHTML=ex.map((h,i)=>`<div class="pl" style="opacity:0;display:flex;justify-content:space-between;border-bottom:1px solid #1c1c20"><span>${h}</span><span style="color:var(--faint)">allowed? <span class="q">—</span> &nbsp; happened? <span class="q">—</span></span></div>`).join("");
+// pipeline nodes
+const NODES=[["01","Identity","AgentRegistry","Agent #003\n<i>ERC-8004</i> #10315"],["02","Firewall","AgentFirewall","target WMON\n0x3bd359C1…5433A\ndeposit() · transfer\n<i>≤</i> 0.02 MON / tx"],["03","Execution","AgentAction","deposit() 0.01 MON\ntx 0x17ec0160…6a37d3"],["04","Proof","AgentProof","14/14 receipt checks\nanchor 0x107ad29f…\n179,045 gas"],["05","Outcome","Outcome adapter","WMON Deposit event\n✓ VERIFIED"],["06","Publish","ERC-8004 registries","validationResponse\n0xec0b469a…\ngiveFeedback\n0x8d0e94ff…"]];
+const NX=(i)=>150+i*272.4;
+$("nodes").innerHTML=NODES.map((n,i)=>`<div class="dot" id="dot${i}" style="left:${NX(i)+4}px"></div><div class="node card" id="nd${i}" style="left:${NX(i)}px"><div class="n">${n[0]}</div><div class="t">${n[1]}</div><div class="c">${n[2]}</div><div class="d" id="dd${i}"></div></div>`).join("");
+const plain=NODES.map(n=>n[3]);
+// sdk
+const NPM="$ npm install agenttrace-monad viem";
+const CODE=`<span class="k">import</span> { traceCall } <span class="k">from</span> <span class="s">"agenttrace-monad"</span>;
+
+<span class="k">const</span> r = <span class="k">await</span> traceCall({
+  network: <span class="s">"monad-mainnet"</span>,
+  signer: process.env.AGENT_KEY, <span class="cm">// executor</span>
+  firewallId: 2,
+  target, data,  <span class="cm">// your agent's call</span>
+});
+
+r.proofStatus  <span class="cm">// "receipt_verified"</span>`;
+function typeHTML(html,p){let n=Math.round(html.replace(/<[^>]+>/g,"").length*C(p)),o="",i=0;while(i<html.length){if(html[i]=="<"){const j=html.indexOf(">",i);o+=html.slice(i,j+1);i=j+1;continue}if(n<=0)break;o+=html[i];n--;i++}return o}
+// monad strip (live values captured from the site at render time)
+$("strip").innerHTML=ST.items.map((it,i)=>`<div class="si" style="flex:1;padding:28px 32px;${i?'border-left:1px solid var(--bd)':''}"><div class="mono" style="font-size:17px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em">${it[0]}</div><div class="mono" style="font-size:44px;margin-top:14px">${it[1]}</div></div>`).join("");
+$("stripnote").textContent=`● LIVE · read from agenttrace-mainnet.vercel.app (chain 143) at ${ST.at}`;
+// verify geometry (page coords from Playwright boxes)
+const VS={x:372,y:757,w:1176},VK=1620/1176;
+const vimg=$("vimg");vimg.style.transform=`translate(${-VS.x*VK}px,${-VS.y*VK}px) scale(${VK})`;
+const V=(x,y)=>[(x-VS.x)*VK,(y-VS.y)*VK];
+{const [x,y]=V(400,862);const m=$("vtypemask");m.style.left=x+"px";m.style.top=y+"px";m.style.height=36*VK+"px";}
+const resTop=V(0,945)[1];$("vresmask").style.top=resTop+"px";
+
+function sceneOpacity(id,t){const s=sc[id],l=t-s.start;if(l<-0.01||l>s.dur+0.01)return 0;const fi=id=="intro"?1:eio(seg(l,0,.55)),fo=id=="close"?1-seg(l,s.dur-1.2,s.dur):1-eio(seg(l,s.dur-.45,s.dur));return Math.min(fi,fo)}
+function render(t){
+ $("grid").style.transform=`translate(${-(t*6)%80}px,${-(t*3)%80}px)`;
+ $("glow").style.transform=`translate(${Math.sin(t*.15)*120}px,${Math.cos(t*.11)*60}px)`;
+ for(const s of TL.scenes){const o=sceneOpacity(s.id,t),el=$("s-"+s.id);el.style.opacity=o;el.style.display=o>0?"block":"none";el.style.transform=`scale(${1+0.012*(1-o)})`}
+ const L=(id)=>t-sc[id].start;
+ // intro
+ {const l=L("intro");const r=eo(seg(l,.2,1.1));$("lrect").style.transform=`scale(${.6+.4*r})`;$("lrect").style.transformOrigin="16px 16px";$("lrect").style.opacity=r;
+  for(const [id,a,len] of [["lp1",.7,30],["lp2",1.3,6],["lc",1.5,17]]){const e=$(id),p=eio(seg(l,a,a+.7));e.style.strokeDasharray=len;e.style.strokeDashoffset=len*(1-p)}
+  const lg=eo(seg(l,.2,1.2));$("logo").style.transform=`translateY(${(1-eo(seg(l,1.9,2.6)))*60}px)`;
+  fadeUp($("wm"),seg(l,1.9,2.6));fadeUp($("tag"),seg(l,2.5,3.3));fadeUp($("intro-eb"),seg(l,3.3,4));}
+ // problem
+ {const l=L("problem"),cu=cuesIn("problem");fadeUp($("p1"),seg(l,.5,1.2));fadeUp($("p2"),seg(l,cu[1],cu[1]+.8));
+  document.querySelectorAll(".pl").forEach((e,i)=>{fadeUp(e,seg(l,.9+i*.25,1.6+i*.25),14)});
+  document.querySelectorAll(".q").forEach((e,i)=>{e.style.color=l>cu[1]+1+i*.12?"#c47a74":"#71717a";e.textContent=l>cu[1]+1+i*.12?"?":"—"});}
+ // blocked
+ {const l=L("blocked"),cu=cuesIn("blocked");fadeUp($("term"),seg(l,.1,.7),30);
+  const cmd='demo_withdraw {"amount": 25}';$("cmd").textContent=type(cmd,seg(l,cu[1]+.3,cu[1]+1.6))+(l<cu[2]&&Math.floor(l*2)%2==0?"▍":"");
+  const rj=seg(l,cu[2]-.1,cu[2]+.4);$("rej").style.opacity=eo(rj);$("rej").style.transform=`translateX(${Math.sin(seg(l,cu[2]-.1,cu[2]+.35)*Math.PI*3)*(1-rj)*10}px)`;
+  $("term").style.borderColor=l>cu[2]?`rgba(196,122,116,${.55*(1-seg(l,cu[2]+.6,cu[2]+2.5))+.2})`:"#27272a";
+  document.querySelectorAll(".ob").forEach((e,i)=>fadeUp(e,seg(l,cu[2]+1.6+i*.3,cu[2]+2.3+i*.3),18));}
+ // pipeline
+ {const l=L("pipeline"),cu=cuesIn("pipeline");const act=[cu[1],cu[2],cu[3],cu[4],cu[5],cu[5]+2.6];
+  for(let i=0;i<6;i++){const p=seg(l,act[i]-.2,act[i]+.4),nd=$("nd"+i);nd.style.opacity=.28+.72*eo(p);nd.style.borderColor=p>0?`rgba(131,110,249,${.15+.6*eo(p)*(1-.6*seg(l,act[i]+1.2,act[i]+2.4))})`:"#27272a";nd.style.transform=`translateY(${(1-eo(p))*14}px)`;
+   $("dot"+i).style.background=p>.3?"#836ef9":"#0a0a0c";$("dot"+i).style.borderColor=p>.3?"#836ef9":"#27272a";
+   const txt=plain[i],tp=seg(l,act[i]+.25,act[i]+1.4);const plainTxt=txt.replace(/<\/?i>/g,"");let shown=type(plainTxt,tp);
+   $("dd"+i).innerHTML=shown.replace("ERC-8004","<i>ERC-8004</i>").replace("≤","<i>≤</i>").replace("✓ VERIFIED",'<span style="color:#8eae96">✓ VERIFIED</span>');}
+  const fill=l<act[0]?0:Math.min(5,(()=>{for(let i=5;i>=0;i--)if(l>=act[i])return i+eio(C((l-act[i])/1.0))*(i<5?0:0);return 0})());
+  // smooth track: interpolate between activations
+  let f=0;for(let i=0;i<5;i++)f+=eio(seg(l,act[i+1]-.5,act[i+1]+.1));$("trackf").style.width=(NX(Math.min(f,5))-150+11)*(l>act[0]-.2?1:0)+"px";
+  const H="proofHash 0xad2bca96c12f0a14e7a0377dacc7a7bbfa58e47be0401935c35beba2ab27103d  ·  agent #001 · rebuilt from public RPC = onchain anchor";
+  const H3="proof 0x30985cb60afd8d37b5edfad48312f32ecffa3e34366d31b7f9ec94ef574a9552  ·  anchored in AgentProof 0x3ea56020…bbd3e";
+  $("phash").textContent=type(H3,seg(l,act[3]+.6,act[3]+2.6));}
+ // live
+ {const l=L("live"),vpW=1500,base=vpW/1920;
+  const shots=[["sh-hero",0,3.4,"/",[[0,0,1],[0,40,1.08]]],["sh-fw",3.4,7.2,"/firewalls/3",[[0,0,1],[930,380,1.75]]],["sh-out",7.2,10.6,"/outcomes/0x30985cb6…4a9552",[[0,0,1],[470,400,1.7]]]];
+  let u="/";for(const [id,a,b,path,kf] of shots){const e=$(id);const o=Math.min(eio(seg(l,a-.2,a+.3)),1-eio(seg(l,b-.2,b+.3)));e.style.opacity=id=="sh-hero"?(l<b-.2?1:o):o;
+   const p=eio(seg(l,a+.4,b-.3));const [x0,y0,z0]=kf[0],[x1,y1,z1]=kf[1];const x=x0+(x1-x0)*p,y=y0+(y1-y0)*p,z=(z0+(z1-z0)*p)*base;e.style.transform=`translate(${-x*z}px,${-y*z}px) scale(${z})`;if(l>=a-.05)u=path;
+   e._cam=[x,y,z];}
+  $("url").innerHTML=`agenttrace-mainnet.vercel.app<b>${u}</b>`;
+  // ring: fw allowed functions rows / outcome status rows (page coords)
+  const R=(id,rx,ry,rw,rh,a,b)=>{const c=$(id)._cam;return{o:Math.min(eo(seg(l,a,a+.4)),1-seg(l,b-.3,b)),x:(rx-c[0])*c[2],y:(ry-c[1])*c[2],w:rw*c[2],h:rh*c[2]}};
+  let r=null;if(l>5.2&&l<7.1)r=R("sh-fw",970,455,600,150,5.2,7.1);else if(l>8.9&&l<10.5)r=R("sh-out",486,440,960,120,8.9,10.5);
+  const ring=$("ring");if(r){ring.style.opacity=r.o;Object.assign(ring.style,{left:r.x+"px",top:r.y+"px",width:r.w+"px",height:r.h+"px"})}else ring.style.opacity=0;}
+ // verify
+ {const l=L("verify"),cu=cuesIn("verify");const [tx,ty]=V(400,862);const tp=seg(l,cu[1]-.2,cu[1]+1.4);const m=$("vtypemask");m.style.left=tx+(V(1440,0)[0]-tx)*tp+"px";m.style.width=Math.max(0,V(1440,0)[0]-tx)*(1-tp)+"px";
+  const cur=$("cur"),[bx,by]=V(1492,880);const cp=eio(seg(l,cu[1]+1.5,cu[1]+2.3));const click=cu[1]+2.4;cur.style.opacity=Math.min(seg(l,cu[1]+1.3,cu[1]+1.6),1-seg(l,click+1.2,click+1.6));
+  cur.style.left=(bx-260*(1-cp))+"px";cur.style.top=(by+180*(1-cp))+"px";cur.style.transform=`scale(${1-.15*Math.sin(seg(l,click,click+.2)*Math.PI)})`;
+  const rp=seg(l,click+.3,click+2.6);const mtop=resTop+(633-resTop)*eio(rp);$("vresmask").style.top=mtop+"px";
+  const vr=$("vring"),[px,py]=V(386,952);const ro=Math.min(eo(seg(l,cu[2]-.1,cu[2]+.4)),1-seg(l,sc.verify.dur-.8,sc.verify.dur-.4));vr.style.opacity=ro;Object.assign(vr.style,{left:px+"px",top:py+"px",width:520*VK+"px",height:38*VK+"px"});
+  const z=1+.04*eio(seg(l,0,sc.verify.dur));$("vwrap").style.transform=`scale(${z})`;}
+ // sdk
+ {const l=L("sdk"),cu=cuesIn("sdk");$("npm").textContent=type(NPM,seg(l,.5,2.2));$("code").innerHTML=typeHTML(CODE,seg(l,cu[1],cu[1]+3.2));}
+ // monad
+ {const l=L("monad"),cu=cuesIn("monad");const fmt=(n)=>Math.round(n).toLocaleString("en-US");
+  const a=eo(seg(l,cu[1],cu[1]+1.6));$("n1").textContent=fmt(179045*a);fadeUp($("m1"),seg(l,cu[1]-.2,cu[1]+.4));
+  const b=eo(seg(l,cu[1]+.9,cu[1]+2.5));$("n2").textContent=fmt(154784*b);fadeUp($("m2"),seg(l,cu[1]+.7,cu[1]+1.3));
+  const c=eo(seg(l,cu[1]+3,cu[1]+4.4));$("n3").textContent="~"+fmt(600*c);fadeUp($("m3"),seg(l,cu[1]+2.8,cu[1]+3.4));
+  fadeUp($("strip"),seg(l,cu[2]-.3,cu[2]+.4));fadeUp($("stripnote"),seg(l,cu[2],cu[2]+.6));}
+ // close
+ {const l=L("close");document.querySelectorAll("#s-close > div").forEach((e,i)=>{if(e.id!="cl")fadeUp(e,seg(l,.1+i*.25,.8+i*.25),20)});document.querySelectorAll(".cl").forEach((e,i)=>fadeUp(e,seg(l,1+i*.3,1.6+i*.3),14));}
+ // captions
+ const cue=TL.cues.find(c=>t>=c.s-.05&&t<c.e+.1);const ct=$("capt");if(cue){ct.textContent=cue.text;ct.style.opacity=Math.min(seg(t,cue.s-.05,cue.s+.12),1-seg(t,cue.e-.05,cue.e+.1))}else ct.style.opacity=0;
+}
+window.render=render;
+</script></body></html>
