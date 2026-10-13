@@ -4,6 +4,10 @@
 
 [![ci](https://github.com/catalystberry842-alt/AgentTrace/actions/workflows/ci.yml/badge.svg)](https://github.com/catalystberry842-alt/AgentTrace/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+**A firewall and an onchain receipt for every AI agent call.**
+
+**How it works:** 1. set what the agent may call → 2. it calls only through the onchain firewall → 3. each call gets a receipt-verified proof and outcome verdict, anchored on Monad.
+
 **Every agent leaves a trace.** An independent validator and audit trail for onchain AI agents on Monad, publishing its verdicts to the official ERC-8004 registries.
 
 > Monad Metropolis · Track 04: Trust, Identity & AI
@@ -12,7 +16,7 @@ An agent holding a wallet can call anything, and afterwards nobody can easily sa
 
 Around that verdict sit the facts it depends on: an onchain **identity** (`AgentRegistry`), an onchain **permission firewall** that is the only path for the call (`AgentFirewall`), and a **receipt-verified execution proof** (14 checks) whose hash is anchored onchain (`AgentProof`) so a verdict cannot later be re-pointed at another execution. It runs live on Monad mainnet and testnet, plugs into existing agents through a one-function SDK (`traceCall`) or an MCP server, and the [`/demo`](https://agenttrace-plum.vercel.app/demo) runs end to end from **one wallet connection and one confirmation**.
 
-**New: trust upgrades** ([details](docs/trust-upgrades.md)) answering review feedback: a **multi-verifier quorum with onchain disputes** (`AgentProofQuorum` + an independently run second verifier), **per-agent custody** (`AgentFirewallV3`: every agent gets its own `AgentVault`, plus expiring **session keys** and one-transaction setup), and the **one-click demo**. The V3 contracts are written and tested; deployment is one command (see [Trust upgrades](#trust-upgrades-verifier-quorum-per-agent-vaults-one-click-setup)).
+**New on mainnet (13 October 2026):** `AgentFirewallV2` with **onchain argument caps** ([`0xf1b03655…`](https://monadvision.com/address/0xf1b0365586d1867133c991046e2fd3006efe16e5)): one capped WMON call executed and one above the cap **reverted onchain** with `ArgumentTooHigh`; and a **2-of-2 verifier quorum** (`AgentProofQuorum` [`0x21aa1604…`](https://monadvision.com/address/0x21aa1604030b413c02f0f69304179f77bcd6adf6)) that anchored that call's proof from two independent keys. See [Amount limits](#amount-limits-argument-caps). Per-agent vaults (`AgentFirewallV3`) are written and tested but **not deployed** (did not fit the gas budget).
 
 | | |
 | --- | --- |
@@ -153,6 +157,13 @@ Solidity 0.8.31, no proxy, no `delegatecall`, no `tx.origin`, custom errors. Sam
 | AgentProof | [`0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e`](https://monadvision.com/address/0x3ea5602072d6028f569f45ea164d5cbe36cbbd3e) | 110869333 | [`0xa347bfa7…`](https://monadvision.com/tx/0xa347bfa7657e54d7457c52b0503eed3209df39e10def8fe3798646bd89a47619) |
 | DemoProtocol | [`0x1664be58ee54af91c756428f466bad6e4f9911c3`](https://monadvision.com/address/0x1664be58ee54af91c756428f466bad6e4f9911c3) | 110869336 | [`0x3e13bee3…`](https://monadvision.com/tx/0x3e13bee34bd16a9701c6372d6338245f593b411f52e9e0fd2b63a2e25ce38b37) |
 
+Added 13 October 2026 (owner: ops wallet `0xB925…6D4E`; record: [`contracts/deployments/mainnet-v2-quorum.json`](contracts/deployments/mainnet-v2-quorum.json)):
+
+| Contract | Address (Monad mainnet, 143) | Deploy tx |
+| --- | --- | --- |
+| AgentFirewallV2 (argument caps) | [`0xf1b0365586d1867133c991046e2fd3006efe16e5`](https://monadvision.com/address/0xf1b0365586d1867133c991046e2fd3006efe16e5) | [`0x79faa67c…`](https://monadvision.com/tx/0x79faa67cb8f06c6f66561eb9a543836d2857a341ce180ca7292539065db4fa21) |
+| AgentProofQuorum (2-of-2: `0x45e2…53fE`, `0x1C13…e5d1`) | [`0x21aa1604030b413c02f0f69304179f77bcd6adf6`](https://monadvision.com/address/0x21aa1604030b413c02f0f69304179f77bcd6adf6) | [`0x9592f228…`](https://monadvision.com/tx/0x9592f2280ab313fd489abe421b88b43f49346e6e79357a4bf0f89c9e5df92df1) |
+
 ### Monad testnet (chain 10143), deployed 3 October 2026
 
 | Contract | Purpose | Address (Monad testnet, 10143) | Deploy block | Deploy tx |
@@ -205,7 +216,7 @@ Full write-up: [docs/trust-upgrades.md](docs/trust-upgrades.md).
 
 **One-click demo.** `/demo` → **Run one-click demo**: connect once, confirm once (EIP-5792 `wallet_sendCalls` atomic batch where supported; otherwise the same calls are queued back to back with no clicks between), then a browser session key, which is the agent's executor, runs the deposit with no wallet prompt, and AgentTrace verifies the receipt, checks the outcome, anchors, shows `withdraw` blocked (simulated, nothing sent), and returns leftover gas.
 
-Status: `AgentFirewallV3`, `AgentVault` and `AgentProofQuorum` are tested in a local EVM (`npm run test:contracts`) and **not deployed yet**; deploy with `npm run deploy:v3:testnet -- --smoke` / `npm run deploy:v3:mainnet` and point the app's `AGENT_FIREWALL_ADDRESS` / `AGENT_PROOF_ADDRESS` at them. The one-click demo works today on the deployed V1 contracts.
+Status: `AgentProofQuorum` is **live on mainnet** at [`0x21aa1604…`](https://monadvision.com/address/0x21aa1604030b413c02f0f69304179f77bcd6adf6) with two new verifier keys and threshold 2; it has anchored one proof (the V2 WMON approve, execution `0x33d24a64…`: attestations [`0xef6aa205…`](https://monadvision.com/tx/0xef6aa20565e00539e164986a13574aae3f54d75fdfc56a0512d3182d1a0f689b) and [`0x53865160…`](https://monadvision.com/tx/0x5386516093a4d1a9d760bf322a0b57232612762ff2f23b245ba6f25884148ada)); `node scripts/verify-proof.mjs 0x8f6042f2280cefddd7dc8d4d3c1615bddffbaa548de276226276dbe5a6ab0acb --firewall 0xf1b0365586d1867133c991046e2fd3006efe16e5 --proof 0x21aa1604030b413c02f0f69304179f77bcd6adf6` prints PASS. Both verifier keys are run by the AgentTrace operator today, so this shows the mechanism, not independent operators. The existing V1 proofs and the hosted app still use the single-verifier `AgentProof`. `AgentFirewallV3` and `AgentVault` are tested in a local EVM (`npm run test:contracts`) and **not deployed** (its deploy alone estimates about 2.68M gas, ≈0.27 MON, beyond the remaining budget); deploy with `npm run deploy:v3:testnet -- --smoke` / `npm run deploy:v3:mainnet` and point the app's `AGENT_FIREWALL_ADDRESS` / `AGENT_PROOF_ADDRESS` at them. The one-click demo works today on the deployed V1 contracts.
 
 ## SDK: `traceCall`
 
@@ -300,10 +311,10 @@ Where each limit is enforced, stated exactly:
 | Limit | Where | Live |
 | --- | --- | --- |
 | Target and selector allowlist, pause, executor, native MON per-transaction and per-period caps | **Onchain**, `AgentFirewall.execute` | Mainnet and testnet (`0x6941…b441`) |
-| Cap on a `uint256` argument, e.g. the `amount` of `deposit(uint256,uint256)` | **Onchain**, `AgentFirewallV2.execute` (`setArgCap`) | **Testnet only**, `0x5b027151faa45e83ac1790a8bf5671388c640fb9` |
+| Cap on a `uint256` argument, e.g. the `amount` of `deposit(uint256,uint256)` | **Onchain**, `AgentFirewallV2.execute` (`setArgCap`) | **Mainnet** `0xf1b0365586d1867133c991046e2fd3006efe16e5`, testnet `0x5b027151faa45e83ac1790a8bf5671388c640fb9` |
 | Same argument cap | **Off-chain**, `traceCall({ limits })` and the MCP server's `AGENT_LIMITS`, checked before simulation | Anywhere the SDK or MCP server runs |
 
-The deployed `AgentFirewall` cannot be changed (no proxy, no admin), so argument caps ship as a new contract, [`contracts/AgentFirewallV2.sol`](contracts/AgentFirewallV2.sol): the same contract plus `setArgCap` / `clearArgCap` / `getArgCap`. Its `AgentAction` event and execution id are byte-identical to V1, so the proof hash and `scripts/verify-proof.mjs` work unchanged. `npm run test:contracts` runs the full V1 firewall suite against V2 and a V2 cap suite (at cap, above cap, `2^255`, truncated calldata, other selectors unaffected, owner-only, clear). The hosted apps still index the V1 firewall only; V2 firewalls do not appear in the UI yet. The off-chain limit stops a confused or prompt-injected model; it does not stop someone holding the executor key who skips the SDK. Only the V2 cap does that.
+The deployed `AgentFirewall` cannot be changed (no proxy, no admin), so argument caps ship as a new contract, [`contracts/AgentFirewallV2.sol`](contracts/AgentFirewallV2.sol): the same contract plus `setArgCap` / `clearArgCap` / `getArgCap`. Its `AgentAction` event and execution id are byte-identical to V1, so the proof hash and `scripts/verify-proof.mjs` work unchanged. `npm run test:contracts` runs the full V1 firewall suite against V2 and a V2 cap suite (at cap, above cap, `2^255`, truncated calldata, other selectors unaffected, owner-only, clear). The hosted apps still index the V1 firewall only; V2 firewalls do not appear in the agent/firewall pages yet (the landing page links the V2 transactions directly). The off-chain limit stops a confused or prompt-injected model; it does not stop someone holding the executor key who skips the SDK. Only the V2 cap does that.
 
 Live on Monad testnet (7 October 2026):
 
@@ -317,7 +328,20 @@ Live on Monad testnet (7 October 2026):
 | `execute` `deposit(12, 100)`: allowed, `AgentAction` + `Deposited(12, 100)` | [`0x347c1512…`](https://testnet.monadvision.com/tx/0x347c1512b9ce49b8447271b596a5043eba6664a6a5f07902402ef99e133ed5e9) |
 | `deposit(12, 900)`: rejected in simulation with `ArgumentTooHigh(1, 0xe2bbb158, 1, 900, 500)` | none sent |
 
-Reproduce: `MONAD_DEPLOYER_PRIVATE_KEY=0x… node scripts/argcap-testnet.mjs` (testnet only, resumable; record in [`contracts/deployments/firewall-v2-testnet.json`](contracts/deployments/firewall-v2-testnet.json)).
+Live on Monad **mainnet** (13 October 2026), WMON Agent #003 (owner `0xB925…6D4E`) on a V2 firewall that allows only `WMON.approve` with `amount ≤ 0.001 WMON`, no value transfers:
+
+| Step | Transaction |
+| --- | --- |
+| Deploy `AgentFirewallV2` at [`0xf1b03655…`](https://monadvision.com/address/0xf1b0365586d1867133c991046e2fd3006efe16e5) | [`0x79faa67c…`](https://monadvision.com/tx/0x79faa67cb8f06c6f66561eb9a543836d2857a341ce180ca7292539065db4fa21) |
+| Create V2 firewall #1 for agent #003 | [`0x38882fe6…`](https://monadvision.com/tx/0x38882fe61bb6fcb1b0106f02c339f4ea9d284312ad318f0d64aae7949de99342) |
+| Allow WMON, allow `approve`, `setArgCap(argIndex 1, max 0.001 WMON)` | [`0xcc6a6d3a…`](https://monadvision.com/tx/0xcc6a6d3a01b973ede935a32cb81d0c63781ecb6477bb325462956268bab8092c), [`0xa36e8264…`](https://monadvision.com/tx/0xa36e82648e0d033a24b7f2416d838acbcba51b8d2080016c3bff8140ff566898), [`0x7ee0082c…`](https://monadvision.com/tx/0x7ee0082c270ec4681ab8e88f8c6a60015ef04397000e117a3a5e6071aac54ce5) |
+| `approve(owner, 0.0005 WMON)`: executed, `AgentAction` + WMON `Approval` | [`0x8f6042f2…`](https://monadvision.com/tx/0x8f6042f2280cefddd7dc8d4d3c1615bddffbaa548de276226276dbe5a6ab0acb) |
+| `approve(owner, 0.005 WMON)`: **sent and reverted onchain**, `ArgumentTooHigh(1, 0x095ea7b3, 1, 5000000000000000, 1000000000000000)` | [`0x0d4b47c3…`](https://monadvision.com/tx/0x0d4b47c32fe3541a5758ec3c28e8736f949a1b38b28c54796faa9284faba3c32) |
+| Proof of the allowed call anchored by the 2-of-2 quorum | [`0xef6aa205…`](https://monadvision.com/tx/0xef6aa20565e00539e164986a13574aae3f54d75fdfc56a0512d3182d1a0f689b), [`0x53865160…`](https://monadvision.com/tx/0x5386516093a4d1a9d760bf322a0b57232612762ff2f23b245ba6f25884148ada) |
+
+`approve` was chosen because it moves no funds. Script: [`scripts/mainnet-argcap-quorum.mjs`](scripts/mainnet-argcap-quorum.mjs) (resumable).
+
+Reproduce on testnet: `MONAD_DEPLOYER_PRIVATE_KEY=0x… node scripts/argcap-testnet.mjs` (testnet only, resumable; record in [`contracts/deployments/firewall-v2-testnet.json`](contracts/deployments/firewall-v2-testnet.json)).
 
 ## Recompute a proof yourself
 
@@ -371,7 +395,7 @@ What you **trust AgentTrace** for:
 - The **verifier wallet** (`0x77a5…0D85`) decides which proof hashes get anchored and what is posted to ERC-8004. Its checks are deterministic and reproducible from public data (the proof hash is a fixed ABI encoding of receipt fields), so anyone can recompute and dispute a verdict, but the contract does not re-verify the receipt itself.
 - **Outcome verdicts** are off-chain judgments over receipt logs (or Demo Protocol state), published as reputation feedback.
 - The `AgentProof` **owner** can change the verifier with `setVerifier`.
-- With [`AgentProofQuorum`](contracts/AgentProofQuorum.sol) (written and tested, not yet deployed) the single verifier becomes a k-of-n set with onchain conflicts, public challenges and revocation; see [Trust upgrades](#trust-upgrades-verifier-quorum-per-agent-vaults-one-click-setup).
+- With [`AgentProofQuorum`](contracts/AgentProofQuorum.sol) (live on mainnet at `0x21aa…adf6`, 2-of-2, one proof anchored; the app still uses `AgentProof`) the single verifier becomes a k-of-n set with onchain conflicts, public challenges and revocation; see [Trust upgrades](#trust-upgrades-verifier-quorum-per-agent-vaults-one-click-setup).
 
 What AgentTrace does **not** claim: that an allowed call was a good idea (a malicious executor can still do anything the owner allowed), or that agents are "safe" or "trustless". Keys: the verifier and deployer keys are server-side environment variables only, never `VITE_` variables, never committed. API keys are SHA-256 hashed; webhooks are HMAC-SHA256 signed. Full write-up: [docs/security.md](docs/security.md).
 
@@ -379,15 +403,17 @@ What AgentTrace does **not** claim: that an allowed call was a good idea (a mali
 
 Stated plainly:
 
-- **Single verifier on the live deployments.** One AgentTrace-run wallet anchors proofs and posts ERC-8004 verdicts today. `AgentProofQuorum` (k-of-n verifiers, conflicts, public challenges, revocation) and an independent `second-verifier.mjs` are written and tested but not deployed yet. No staking, slashing or challenger bonds.
-- **Outcome checks are narrow.** Arbitrary contracts support `EVENT_EMITTED` only. Balance/value/state checks work only for the bundled Demo Protocol. Anything else is `unverifiable`.
-- **One real protocol so far.** Agent #003 calls canonical WMON on mainnet. The other live examples use `DemoProtocol`, an accounting-only contract with no custody. Built-in outcome adapters exist only for WMON `deposit`/`transfer` and the Demo Protocol.
-- **Shared custody in the deployed V1 firewall.** On the live V1 `AgentFirewall`, calls run with `msg.sender` = the single firewall contract, so tokens a protocol sends to the caller sit in that shared contract, and any firewall that allows `transfer` on that token could move them. Use protocols that pay an explicit recipient, or return the tokens in the next call, as agent #003 does. `AgentFirewallV3` fixes this with a per-agent `AgentVault` and session keys; it is tested but not deployed yet.
+- **The app still uses a single verifier.** One AgentTrace-run wallet anchors the app's proofs and posts ERC-8004 verdicts. `AgentProofQuorum` is deployed on mainnet (2-of-2) and anchored one proof, but both verifier keys are held by the same operator, and the hosted app is not pointed at it. No staking, slashing or challenger bonds.
+- **Outcome checks are event-based.** Built-in adapters: WMON `Deposit`/`Withdrawal`, any ERC-20 `Transfer` (`transfer`, `transferFrom`) and `Approval`, and the Demo Protocol. Arbitrary contracts support `EVENT_EMITTED` only; balance/state checks work only for the Demo Protocol. Anything else is `unverifiable`.
+- **One real protocol so far.** Agent #003 calls canonical WMON on mainnet. The other live examples use `DemoProtocol`, an accounting-only contract with no custody.
+- **Shared custody in the deployed V1 firewall.** On the live V1 `AgentFirewall`, calls run with `msg.sender` = the single firewall contract, so tokens a protocol sends to the caller sit in that shared contract, and any firewall that allows `transfer` on that token could move them. Use protocols that pay an explicit recipient, or return the tokens in the next call, as agent #003 does. `AgentFirewallV3` fixes this with a per-agent `AgentVault` and session keys; it is tested but not deployed.
 - **Small live footprint.** Five active agents on mainnet: #001 (ERC-8004 #10280), Treasury Agent #002 (MCP; not ERC-8004 linked), WMON Agent #003 (ERC-8004 #10315; owner and executor are the same wallet), and Research Agents #004 and #005, registered by an outside wallet (`0x157e73ae…40f6`). Seven receipt-verified, anchored executions as of 13 October 2026. On testnet, earlier test agents were deactivated; agent #006 is the showcase, and agent #012 ("ArgCap Agent") uses an `AgentFirewallV2` firewall that the app does not index yet.
 - **No server-side executor.** The API evaluates policy but does not send firewall transactions; the agent (or SDK) signs.
 - **Hosted apps run wallet-only.** API keys and webhooks need an account database, which the hosted deployments do not run; the developer API client is testnet/self-hosted only.
 - **Not audited.** No external audit; contracts are not upgradeable.
-- **Argument caps are onchain only on testnet.** The deployed `AgentFirewall` (mainnet and testnet) checks target + selector + value, not argument values. `AgentFirewallV2` adds onchain argument caps and is deployed on testnet only; on mainnet an amount cap is the SDK/MCP off-chain check. See [Amount limits](#amount-limits-argument-caps).
+- **Argument caps need the V2 firewall.** The original `AgentFirewall` checks target + selector + value, not argument values; agents #001–#005's existing firewalls are V1. `AgentFirewallV2` (onchain argument caps) is live on mainnet and testnet but not indexed by the app's agent pages. See [Amount limits](#amount-limits-argument-caps).
+- **Original deployer wallet lost.** The wallet that deployed the V1 contracts and owns agents #001 and #002 is no longer accessible, so their firewalls cannot be reconfigured. Their proofs remain anchored and verifiable. New contracts are owned by the ops wallet `0xB925…6D4E`.
+- **Low outside usage.** One outside wallet has registered agents (#004, #005).
 
 ## Why Monad
 
@@ -403,7 +429,9 @@ AgentTrace writes to the chain at every step: register, policy, execute, anchor,
 | ERC-8004 `register` + metadata | 291,834 (estimate) | ≈0.030 |
 | ERC-8004 `validationRequest` | 276,048 | ≈0.028 |
 
-Deploying all four contracts on mainnet cost 0.352 MON in total; anchoring a verified execution costs about 0.018 MON. Per the [Monad docs](https://docs.monad.xyz/developer-essentials/summary), blocks come every 300 ms and are final after two blocks (about 600 ms), so a proof is anchored and readable within seconds and the verifier does not handle reorgs. In the recorded MCP session the whole allowed tool call (simulate, send, receipt, verify) took 2.1 s. Monad is EVM-compatible, so the contracts are ordinary Solidity and the app uses viem. The indexer is built around Monad's public-RPC limit of 100 blocks per `eth_getLogs` and uses Envio HyperSync's Monad endpoints.
+Measured on 13 October 2026 (same 102 gwei): `AgentFirewallV2.execute` of a capped `WMON.approve` 191,316 gas (≈0.020 MON); a 2-of-2 quorum anchor 248,697 + 110,178 gas (≈0.037 MON); a call the cap rejects costs only its gas limit (120,000 gas, ≈0.012 MON) and changes nothing. Average block interval over the last 10,000 mainnet blocks: ≈0.30 s.
+
+Deploying all four contracts on mainnet cost 0.352 MON in total; anchoring a verified execution costs about 0.018 MON. A per-call receipt is two extra writes per agent action (the firewall call and the anchor), about 0.034 MON and under a second together; at that cost and speed it is reasonable to receipt every call rather than sample. Per the [Monad docs](https://docs.monad.xyz/developer-essentials/summary), blocks come every 300 ms and are final after two blocks (about 600 ms), so a proof is anchored and readable within seconds and the verifier does not handle reorgs. In the recorded MCP session the whole allowed tool call (simulate, send, receipt, verify) took 2.1 s. Monad is EVM-compatible, so the contracts are ordinary Solidity and the app uses viem. The indexer is built around Monad's public-RPC limit of 100 blocks per `eth_getLogs` and uses Envio HyperSync's Monad endpoints.
 
 ## Run it locally
 
@@ -538,12 +566,12 @@ From the live mainnet app, captured with `node scripts/readme-screenshots.mjs`:
 
 ## Roadmap
 
-- Deploy `AgentProofQuorum` with a second, independently operated verifier (contract and `second-verifier.mjs` are done)
+- Hand one `AgentProofQuorum` verifier key to an independent operator and point the app at the quorum
 - Deploy `AgentFirewallV3` (per-agent vaults, session keys, one-transaction setup; also brings onchain argument caps to mainnet) and index it in the app
 - EIP-7702 policy module so an agent's own address can be the custody account
 - Verifier staking/slashing and challenger bonds on top of the quorum's challenge events
-- More built-in outcome adapters for Monad protocols (WMON is the first)
-- Publish `agenttrace-monad` to npm; packaged MCP server
+- Outcome adapters for more Monad protocols (WMON and generic ERC-20 events today)
+- Packaged MCP server
 - A configured executor that can submit `execute` from the API without weakening firewall checks
 - External contract audit
 

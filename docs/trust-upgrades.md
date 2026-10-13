@@ -1,8 +1,11 @@
 # Trust upgrades: verifier quorum, per-agent custody, one-click setup
 
 Three pieces of reviewer feedback, and what changed for each. Everything here is in the repository
-and tested in a local EVM (`npm run test:contracts`). The V3 contracts are **not deployed yet**:
-deploying them is one command (`npm run deploy:v3:testnet`, then mainnet), listed at the end. The
+and tested in a local EVM (`npm run test:contracts`). **Update 13 October 2026:** `AgentProofQuorum` is deployed on
+Monad mainnet at `0x21aa1604030b413c02f0f69304179f77bcd6adf6` (2-of-2, two new verifier keys run by
+the AgentTrace operator) and has anchored one proof (see the README, "Amount limits"). `AgentFirewallV3`
+/ `AgentVault` are **not deployed** (≈2.68M gas, beyond the budget); deploying them is one command
+(`npm run deploy:v3:testnet`, then mainnet), listed at the end. The
 one-click demo works today against the deployed V1 contracts.
 
 ## 1. "Single verifier wallet": AgentProofQuorum and disputes

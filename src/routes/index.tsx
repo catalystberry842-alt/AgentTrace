@@ -50,16 +50,35 @@ const TRUST = [
   {
     title: "Verifier quorum",
     text: "Proofs anchor only when k-of-n independent verifiers agree. Conflicts are marked disputed; anyone can challenge onchain.",
-    status: "Tested · deploying",
-    live: false,
+    status: IS_MAINNET ? "Live · 2-of-2 on mainnet" : "Live on mainnet",
+    live: true,
   },
   {
     title: "Per-agent vaults",
     text: "Each agent calls through its own vault, so protocol payouts never sit in a shared contract. Session keys expire.",
-    status: "Tested · deploying",
+    status: "Tested · not deployed",
     live: false,
   },
 ] as const;
+
+/** AgentFirewallV2 onchain argument cap: one real call allowed, one rejected by the contract. */
+const ARGCAP = IS_MAINNET
+  ? {
+      explorer: "https://monadvision.com",
+      contract: "0xf1b0365586d1867133c991046e2fd3006efe16e5",
+      rule: "Agent #003 may call WMON.approve with amount ≤ 0.001 WMON",
+      allowed: { label: "approve 0.0005 WMON · executed", tx: "0x8f6042f2280cefddd7dc8d4d3c1615bddffbaa548de276226276dbe5a6ab0acb" },
+      blocked: { label: "approve 0.005 WMON · reverted onchain, ArgumentTooHigh", tx: "0x0d4b47c32fe3541a5758ec3c28e8736f949a1b38b28c54796faa9284faba3c32" },
+      quorum: { label: "Allowed call anchored by 2-of-2 verifier quorum", tx: "0x5386516093a4d1a9d760bf322a0b57232612762ff2f23b245ba6f25884148ada" },
+    }
+  : {
+      explorer: "https://testnet.monadvision.com",
+      contract: "0x5b027151faa45e83ac1790a8bf5671388c640fb9",
+      rule: "Agent #012 may call DemoProtocol.deposit with amount ≤ 500",
+      allowed: { label: "deposit 100 · executed", tx: "0x347c1512b9ce49b8447271b596a5043eba6664a6a5f07902402ef99e133ed5e9" },
+      blocked: null as null | { label: string; tx: string },
+      quorum: null as null | { label: string; tx: string },
+    };
 
 const SNIPPET = `import { traceCall } from "agenttrace-monad";
 
@@ -204,11 +223,16 @@ function Landing({ pending }: { pending: boolean }) {
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-ok" aria-hidden />
             Live on {MONAD_TESTNET.label} · chain {MONAD_TESTNET.chainId}
           </p>
-          <h1 className="type-display mt-5 max-w-xl text-balance">Every agent leaves a trace.</h1>
+          <h1 className="type-display mt-5 max-w-xl text-balance">A firewall and an onchain receipt for every AI agent call.</h1>
+          <ol className="mt-5 flex max-w-lg flex-col gap-1.5 font-mono text-xs text-muted sm:flex-row sm:flex-wrap sm:gap-x-4">
+            <li><span className="text-faint">1</span> Set what the agent may call</li>
+            <li><span className="text-faint">2</span> It calls only through the firewall</li>
+            <li><span className="text-faint">3</span> Each call gets a verified, anchored receipt</li>
+          </ol>
           <p className="mt-5 max-w-lg text-base text-pretty text-muted">
-            AgentTrace is an independent validator for onchain agents. It fences what an agent may call, checks from the
-            Monad receipt whether the call achieved its purpose, and publishes that verdict to the shared ERC-8004
-            registries, so anyone can read an agent's record without trusting this site.
+            AgentTrace fences what an onchain agent may call, checks from the Monad receipt whether the call achieved its
+            purpose, and publishes that verdict to the shared ERC-8004 registries, so anyone can read an agent's record
+            without trusting this site.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link to="/proofs/$proofId" params={{ proofId: SHOWCASE.proof }} className={primaryClass}>
@@ -240,7 +264,37 @@ function Landing({ pending }: { pending: boolean }) {
         <VerifyBox example={EX.proof} />
       </div>
 
-      <section className="mt-16 border-t border-border pt-8" aria-labelledby="how">
+      <section className="mt-16 border-t border-border pt-8" aria-labelledby="argcap">
+        <h2 id="argcap" className="text-sm font-medium">
+          Onchain amount cap, live
+        </h2>
+        <p className="mt-3 max-w-2xl text-sm text-pretty text-muted">
+          {ARGCAP.rule}. The limit lives in{" "}
+          <a href={`${ARGCAP.explorer}/address/${ARGCAP.contract}`} className="font-mono text-fg hover:underline" rel="noreferrer">
+            AgentFirewallV2 {ARGCAP.contract.slice(0, 10)}…
+          </a>
+          , so a call above it reverts in the contract, not in this app.
+        </p>
+        <ul className="mt-4 divide-y divide-border border-y border-border text-sm">
+          {[
+            { tone: "text-ok", mark: "Allowed", row: ARGCAP.allowed },
+            ...(ARGCAP.blocked ? [{ tone: "text-danger", mark: "Rejected", row: ARGCAP.blocked }] : []),
+            ...(ARGCAP.quorum ? [{ tone: "text-ok", mark: "Anchored", row: ARGCAP.quorum }] : []),
+          ].map(({ tone, mark, row }) => (
+            <li key={row.tx} className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+              <span>
+                <span className={`mr-3 font-mono text-xs ${tone}`}>{mark}</span>
+                {row.label}
+              </span>
+              <a href={`${ARGCAP.explorer}/tx/${row.tx}`} className="font-mono text-xs text-muted hover:text-fg" rel="noreferrer">
+                {row.tx.slice(0, 10)}…
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="mt-14 border-t border-border pt-8" aria-labelledby="how">
         <h2 id="how" className="text-sm font-medium">
           How one agent action is checked
         </h2>
@@ -317,23 +371,31 @@ function Landing({ pending }: { pending: boolean }) {
           <h2 className="text-sm font-medium">Why Monad</h2>
           <dl className="mt-3 divide-y divide-border border-y border-border text-sm">
             <div className="flex items-baseline justify-between gap-4 py-2.5">
-              <dt className="text-muted">Proof anchor</dt>
+              <dt className="text-muted">Proof anchor (one verifier)</dt>
               <dd>179,045 gas · ≈0.018 MON at 102 gwei</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-4 py-2.5">
+              <dt className="text-muted">Proof anchor (2-of-2 quorum)</dt>
+              <dd>248,697 + 110,178 gas · ≈0.037 MON</dd>
             </div>
             <div className="flex items-baseline justify-between gap-4 py-2.5">
               <dt className="text-muted">Firewall execute</dt>
               <dd>154,784 gas · ≈0.016 MON</dd>
             </div>
             <div className="flex items-baseline justify-between gap-4 py-2.5">
+              <dt className="text-muted">Block interval</dt>
+              <dd>≈0.30 s (measured, 10,000 mainnet blocks)</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-4 py-2.5">
               <dt className="text-muted">Finality</dt>
               <dd>2 blocks · ≈600 ms (Monad docs)</dd>
             </div>
-            <div className="flex items-baseline justify-between gap-4 py-2.5">
-              <dt className="text-muted">Contracts</dt>
-              <dd className="text-right">4 Solidity contracts on chain {MONAD_TESTNET.chainId}</dd>
-            </div>
           </dl>
-          <p className="mt-3 text-xs text-faint">Gas from real Monad receipts. Every step is an onchain write, so cost and finality decide whether this is practical.</p>
+          <p className="mt-3 text-xs text-pretty text-faint">
+            Gas from real Monad mainnet receipts (13 Oct 2026, 102 gwei). A per-call receipt means two extra writes per agent
+            action: the firewall call and the anchor. At about 0.034 MON (0.016 + 0.018) and under a second per action that is practical for every
+            call, not a sample.
+          </p>
         </div>
       </section>
     </Shell>
