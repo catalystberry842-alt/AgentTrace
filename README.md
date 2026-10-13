@@ -1,3 +1,5 @@
+<p><img src="docs/brand/agenttrace-mark.svg" alt="AgentTrace" width="56" height="56"></p>
+
 # AgentTrace
 
 [![ci](https://github.com/catalystberry842-alt/AgentTrace/actions/workflows/ci.yml/badge.svg)](https://github.com/catalystberry842-alt/AgentTrace/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)

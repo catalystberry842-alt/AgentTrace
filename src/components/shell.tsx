@@ -392,9 +392,7 @@ export function Shell({ children, wide = false }: { children: ReactNode; wide?: 
       <header className="sticky top-0 z-20 border-b border-border bg-bg/95 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-[1240px] items-center gap-8 px-5 lg:px-8">
           <Link to="/" className="flex shrink-0 items-center gap-2 text-sm font-semibold tracking-tight">
-            <span className="grid h-5 w-5 place-items-center rounded-[5px] bg-accent font-mono text-[10px] text-accent-fg" aria-hidden>
-              AT
-            </span>
+            <LogoMark className="h-6 w-6" />
             AgentTrace
           </Link>
           <nav className="hidden items-center gap-6 lg:flex" aria-label="Product">
@@ -471,5 +469,17 @@ export function Shell({ children, wide = false }: { children: ReactNode; wide?: 
         </div>
       </footer>
     </div>
+  );
+}
+
+/** AgentTrace mark: an "A" drawn as one trace whose path ends in an anchor node. Same geometry as /favicon.svg. */
+export function LogoMark({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" fill="none" className={className} aria-hidden>
+      <rect width="32" height="32" rx="8" fill="#836EF9" />
+      <path d="M8 24.5 L16 7.5 L21.2 18.6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M11.4 18.5 H16.5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="23.2" cy="22.8" r="2.6" stroke="#fff" strokeWidth="2.2" />
+    </svg>
   );
 }
