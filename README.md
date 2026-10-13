@@ -230,7 +230,7 @@ const result = await traceCall({
 
 What it does: simulates `AgentFirewall.execute` (a call the firewall would block throws `FIREWALL_REJECTED` naming the contract's custom error, and nothing is sent) → sends the transaction → reads `AgentAction` from the receipt → asks the AgentTrace server to verify (the verdict is the server's receipt check, never the SDK's) → asks the verifier to anchor. Runnable example: [`sdk/examples/trace-call.ts`](sdk/examples/trace-call.ts). A testnet run on 5 October 2026 (firewall #004, agent #006) sent [`0xfa6772c0…`](https://testnet.monadvision.com/tx/0xfa6772c0ed15a0dc571b3795dcf23a9ba913d7548aae83a77d4dd0043cbceb0b) and returned `receipt_verified` for execution [`0x05eb59f6…`](https://agenttrace-plum.vercel.app/proofs/0x05eb59f6cf91d1ce47ece012c044e0df3f8a4205a1c33a962f7089d0c11fa030).
 
-The SDK also has a typed client (`AgentTrace`) for the developer API. The package is in `sdk/`, named `agenttrace-monad`, built to `dist/` and `npm pack` tested; it is not yet published to npm. Full reference: [docs/sdk.md](docs/sdk.md).
+The SDK also has a typed client (`AgentTrace`) for the developer API. The package is in `sdk/`, named `agenttrace-monad`, published on npm as [`agenttrace-monad`](https://www.npmjs.com/package/agenttrace-monad): `npm install agenttrace-monad viem`. Full reference: [docs/sdk.md](docs/sdk.md).
 
 ## MCP firewall server (mainnet)
 
@@ -385,7 +385,6 @@ Stated plainly:
 - **Small live footprint.** Three active agents on mainnet: #001 (ERC-8004 #10280), Treasury Agent #002 (MCP; not ERC-8004 linked), and WMON Agent #003 (ERC-8004 #10315; owner and executor are the same wallet). On testnet, earlier test agents were deactivated; agent #006 is the showcase, and agent #012 ("ArgCap Agent") uses an `AgentFirewallV2` firewall that the app does not index yet.
 - **No server-side executor.** The API evaluates policy but does not send firewall transactions; the agent (or SDK) signs.
 - **Hosted apps run wallet-only.** API keys and webhooks need an account database, which the hosted deployments do not run; the developer API client is testnet/self-hosted only.
-- **SDK not on npm yet.** `sdk/` is packaged as `agenttrace-monad` (`cd sdk && npm pack` builds `dist/` and a tarball) but has not been published.
 - **Not audited.** No external audit; contracts are not upgradeable.
 - **Argument caps are onchain only on testnet.** The deployed `AgentFirewall` (mainnet and testnet) checks target + selector + value, not argument values. `AgentFirewallV2` adds onchain argument caps and is deployed on testnet only; on mainnet an amount cap is the SDK/MCP off-chain check. See [Amount limits](#amount-limits-argument-caps).
 

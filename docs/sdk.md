@@ -1,6 +1,6 @@
 # SDK
 
-Package: `agenttrace-monad` in `sdk/` (`cd sdk && npm pack` builds `dist/` and a tarball). It is not yet published to npm. `viem` (2.40 or newer) is a peer dependency.
+Package: [`agenttrace-monad`](https://www.npmjs.com/package/agenttrace-monad) on npm (`npm install agenttrace-monad viem`), source in `sdk/`. `viem` (2.40 or newer) is a peer dependency.
 
 ## `traceCall`: one line for an existing agent
 
