@@ -84,7 +84,7 @@ try {
 } catch (e) {
   const data = e.walk?.((x) => typeof x?.data === "string")?.data ?? e.data;
   let err = String(e.shortMessage ?? e.message).slice(0, 200);
-  try { const d = decodeErrorResult({ abi: fw.abi, data }); err = `${d.errorName}(${d.args.join(", ")})`; } catch {}
+  try { const d = decodeErrorResult({ abi: fw.abi, data }); err = `${d.errorName}(${d.args.join(", ")})`; } catch { /* not a known custom error: keep the raw revert data */ }
   rec.rejected = { amountWei: String(OVER), capWei: String(CAP), sent: false, checkedBy: "eth_call", error: err };
 }
 rec.vaultWMON = String(await pub.readContract({ address: WMON, abi: wmonAbi, functionName: "balanceOf", args: [rec.vault] }));

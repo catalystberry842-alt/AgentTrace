@@ -1,4 +1,5 @@
-import { chromium } from "/workspace/AgentTrace/node_modules/playwright/index.mjs";
+/* global render -- defined by index.html, evaluated inside the Playwright page */
+import { chromium } from "playwright";
 import { spawn } from "node:child_process";import fs from "node:fs";
 const FPS=+(process.env.FPS||60), T=73, N=Math.round(T*FPS), mode=process.argv[2];
 const b=await chromium.launch();
