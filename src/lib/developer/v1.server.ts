@@ -15,7 +15,7 @@ import {
   syncFirewallSafe,
 } from "@/lib/chain/firewall.server";
 import { getExecutionProof, verifyIndexedExecution } from "@/lib/chain/proof.server";
-import { MONAD_TESTNET } from "@/lib/chain/network";
+import { IS_MAINNET, MONAD_TESTNET } from "@/lib/chain/network";
 import { apiError, apiJson } from "@/lib/developer/errors";
 import { assessFirewallCall } from "@/lib/developer/policy";
 import type { ApiContext } from "@/lib/developer/guard.server";
@@ -60,7 +60,7 @@ export async function getAgent(agentId: string): Promise<Response> {
     active: agent.active,
     metadataURI: agent.metadataURI,
     registeredAt: agent.registeredAt,
-    network: "monad-testnet",
+    network: IS_MAINNET ? "monad-mainnet" : "monad-testnet",
     chainId: MONAD_TESTNET.chainId,
   });
 }
@@ -171,7 +171,7 @@ export async function getFirewall(firewallId: string): Promise<Response> {
     periodDuration: firewall.periodDuration,
     allowedTargets: firewall.allowedTargets,
     allowedFunctions: firewall.allowedFunctions,
-    network: "monad-testnet",
+    network: IS_MAINNET ? "monad-mainnet" : "monad-testnet",
     chainId: MONAD_TESTNET.chainId,
   });
 }

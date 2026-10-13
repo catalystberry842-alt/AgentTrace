@@ -47,7 +47,7 @@ function SdkPage() {
       <p className="type-caption text-faint">Developers</p>
       <h1 className="type-heading mt-2 md:text-3xl">SDK &amp; MCP</h1>
       <p className="mt-3 max-w-2xl text-sm text-muted">
-        <Mono>agenttrace-monad</Mono> is the TypeScript package in <Mono>sdk/</Mono> of the repository (built and <Mono>npm pack</Mono>-tested, not yet published to npm). Supported networks: <Mono>monad-mainnet</Mono> and <Mono>monad-testnet</Mono>.
+        <Mono>agenttrace-monad</Mono> is the TypeScript package in <Mono>sdk/</Mono> of the repository (published on npm as <Mono>agenttrace-monad@0.1.0</Mono>). Supported networks: <Mono>monad-mainnet</Mono> and <Mono>monad-testnet</Mono>.
       </p>
       <DeveloperNav current="/developers/sdk" />
 
