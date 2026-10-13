@@ -1,0 +1,80 @@
+{
+  "chainId": 143,
+  "network": "Monad mainnet",
+  "registry": "0xfa66d202dae4b7fb9aa5c6ee80390ca8bb48739e",
+  "wmon": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+  "agentId": "3",
+  "owner": "0xB925D44d52815D19C2f91c30f6aBD3B4D0546D4E",
+  "txs": {
+    "deployAgentFirewallV3": "0x45fc83132aa729243643e8d30cbb35182dd7b638920402de868a8cfa424b0dd4",
+    "createFirewallWithPermissions": "0xe2bb39554863e52ce0733db469e6e1accdae762d06965ac93cf904ef3d0d1247",
+    "setArgCapTransferAmount": "0xb2bf31ed71ae0b4b82fde57aa479e68efd96147b5f36085f7a8716f7e51b275a",
+    "wrapMON": "0x893ea774d283a830d81f6d1ebeb61bd13f2fcc78b5ece50b56fa192d10250c9b",
+    "vaultDepositWMON": "0xcc1225eed773099349e09fe3ee84d110f42986deccb6ba3ad0ff0b2ad51ee0dd",
+    "executeCappedTransfer": "0xd350cddbdee1cf8a662b117a1bee3e12c7c31d1b6f51ac4263652b769bcc698d"
+  },
+  "gas": {
+    "deployAgentFirewallV3": {
+      "limit": "3078570",
+      "used": "3078570",
+      "price": "102000000000",
+      "status": "success",
+      "block": "113019282"
+    },
+    "createFirewallWithPermissions": {
+      "limit": "810922",
+      "used": "810922",
+      "price": "102000000000",
+      "status": "success",
+      "block": "113019289"
+    },
+    "setArgCapTransferAmount": {
+      "limit": "150011",
+      "used": "150011",
+      "price": "102000000000",
+      "status": "success",
+      "block": "113019295"
+    },
+    "wrapMON": {
+      "limit": "58904",
+      "used": "58904",
+      "price": "102000000000",
+      "status": "success",
+      "block": "113019302"
+    },
+    "vaultDepositWMON": {
+      "limit": "73910",
+      "used": "73910",
+      "price": "102000000000",
+      "status": "success",
+      "block": "113019312"
+    },
+    "executeCappedTransfer": {
+      "limit": "237250",
+      "used": "237250",
+      "price": "102000000000",
+      "status": "success",
+      "block": "113019318"
+    }
+  },
+  "startBalance": "1240804330400000000",
+  "agentFirewallV3": "0x06f7ba5b998e3b33ed8df7a936eac82ea95be50f",
+  "deployBlock": "113019282",
+  "firewallId": "1",
+  "vault": "0x909Fbc69245583AD2aF9184c8c37c1667823C77A",
+  "allowed": {
+    "amountWei": "400000000000000",
+    "capWei": "500000000000000",
+    "executionId": "0x4cee27435ea7fc6283ad2a4d58cdc867851bef79e8cf914536334ef7e2061a4b"
+  },
+  "rejected": {
+    "amountWei": "900000000000000",
+    "capWei": "500000000000000",
+    "sent": false,
+    "checkedBy": "eth_call",
+    "error": "ArgumentTooHigh(1, 0xa9059cbb, 1, 900000000000000, 500000000000000)"
+  },
+  "vaultWMON": "600000000000000",
+  "opsSpentWei": "450775834000000000",
+  "opsSpentMON": "0.450775834"
+}

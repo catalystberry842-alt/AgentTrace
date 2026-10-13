@@ -56,8 +56,8 @@ const TRUST = [
   {
     title: "Per-agent vaults",
     text: "Each agent calls through its own vault, so protocol payouts never sit in a shared contract. Session keys expire.",
-    status: "Tested · not deployed",
-    live: false,
+    status: "Live on mainnet",
+    live: true,
   },
 ] as const;
 

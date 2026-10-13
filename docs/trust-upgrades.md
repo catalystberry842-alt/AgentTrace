@@ -2,10 +2,11 @@
 
 Three pieces of reviewer feedback, and what changed for each. Everything here is in the repository
 and tested in a local EVM (`npm run test:contracts`). **Update 13 October 2026:** `AgentProofQuorum` is deployed on
-Monad mainnet at `0x21aa1604030b413c02f0f69304179f77bcd6adf6` (2-of-2, two new verifier keys run by
-the AgentTrace operator) and has anchored one proof (see the README, "Amount limits"). `AgentFirewallV3`
-/ `AgentVault` are **not deployed** (≈2.68M gas, beyond the budget); deploying them is one command
-(`npm run deploy:v3:testnet`, then mainnet), listed at the end. The
+Monad mainnet at `0x21aa1604030b413c02f0f69304179f77bcd6adf6` (2-of-2; verifier A runs on the
+operator box, verifier B `0x1C13…e5d1` is held by a separate party, the project owner's personal custody) and has anchored one proof (see the README, "Amount limits"). `AgentFirewallV3`
+/ `AgentVault` are **live on mainnet** at `0x06f7ba5b998e3b33ed8df7a936eac82ea95be50f` (firewall #1 for WMON Agent #003, vault
+`0x909Fbc69245583AD2aF9184c8c37c1667823C77A`, one WMON deposit and one capped `transfer` out of the vault; record in
+`contracts/deployments/mainnet-v3-vault.json`). The hosted app does not index V3 yet. The
 one-click demo works today against the deployed V1 contracts.
 
 ## 1. "Single verifier wallet": AgentProofQuorum and disputes
