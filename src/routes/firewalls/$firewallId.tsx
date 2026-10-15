@@ -221,7 +221,14 @@ function Record({
         )}
       </section>
 
-      <FirewallControls firewall={firewall} onReload={onReload} />
+      {/^\d+$/.test(firewall.id) ? (
+        <FirewallControls firewall={firewall} onReload={onReload} />
+      ) : (
+        <p className="mt-8 text-sm text-muted">
+          This firewall lives on another AgentFirewall contract ({firewall.id.split("-")[0]}). It is shown read-only here;
+          manage it from the owner wallet against that contract.
+        </p>
+      )}
     </article>
   );
 }

@@ -13,6 +13,12 @@ import {
 import { cacheKey, hydrateFromCache, recordScan } from "@/lib/chain/chain-cache.server";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { scanLogs } from "@/lib/chain/log-scan.server";
+import {
+  namespacedFirewallId,
+  parseExtraSources,
+  splitFirewallRef,
+  type FirewallSource,
+} from "@/lib/chain/firewall-sources";
 import { ensureExecutedProof } from "@/lib/chain/proof-store";
 import { publishDeveloperEvent } from "@/lib/developer/webhooks.server";
 import type {
@@ -32,11 +38,16 @@ type SyncSlot = {
   inflight?: Promise<IndexerStatus>;
 };
 
-const slot = globalThis as typeof globalThis & { __agenttraceFirewallSync?: SyncSlot };
+const slot = globalThis as typeof globalThis & { __agenttraceFirewallSyncs?: Map<string, SyncSlot> };
 
-function syncSlot(): SyncSlot {
-  slot.__agenttraceFirewallSync ??= {};
-  return slot.__agenttraceFirewallSync;
+function syncSlot(key: string): SyncSlot {
+  slot.__agenttraceFirewallSyncs ??= new Map();
+  let s = slot.__agenttraceFirewallSyncs.get(key);
+  if (!s) {
+    s = {};
+    slot.__agenttraceFirewallSyncs.set(key, s);
+  }
+  return s;
 }
 
 export function configuredFirewall(): `0x${string}` | null {
@@ -51,6 +62,33 @@ export function configuredFirewallDeployBlock(): number | null {
   const fromEnv = process.env.AGENT_FIREWALL_DEPLOY_BLOCK?.trim() ?? "";
   if (/^\d+$/.test(fromEnv)) return Number(fromEnv);
   return deployment.firewallDeployBlock;
+}
+
+/** Every indexed firewall contract: the primary (plain ids) first, then AGENT_FIREWALL_EXTRA_SOURCES. */
+export function firewallSources(): FirewallSource[] {
+  const primary = configuredFirewall();
+  const block = configuredFirewallDeployBlock();
+  const list: FirewallSource[] = [];
+  if (primary && block != null) list.push({ key: "", address: primary.toLowerCase() as `0x${string}`, deployBlock: block });
+  try {
+    list.push(...parseExtraSources(process.env.AGENT_FIREWALL_EXTRA_SOURCES, primary));
+  } catch (err) {
+    console.error("[agenttrace-firewall]", err instanceof Error ? err.message : err);
+  }
+  return list;
+}
+
+/** The firewall contract a stored firewall ref belongs to (null if its source is not configured). */
+export function contractForFirewallRef(ref: string): `0x${string}` | null {
+  const parts = splitFirewallRef(ref);
+  if (!parts) return null;
+  if (!parts.key) return configuredFirewall();
+  return firewallSources().find((s) => s.key === parts.key)?.address ?? null;
+}
+
+/** The onchain numeric firewall id for a stored ref (`v3-7` -> `7`). Used in proof hashes. */
+export function onchainFirewallId(ref: string): string {
+  return splitFirewallRef(ref)?.id ?? ref;
 }
 
 function asId(value: unknown): string | null {
@@ -110,7 +148,7 @@ const KNOWN = new Set([
   "FirewallOwnerSynced",
 ]);
 
-export async function applyFirewallLog(sql: Sql, firewall: string, log: Log): Promise<boolean> {
+export async function applyFirewallLog(sql: Sql, firewall: string, log: Log, sourceKey = ""): Promise<boolean> {
   if (!log.address || log.address.toLowerCase() !== firewall.toLowerCase()) return false;
   if (log.blockNumber == null || log.logIndex == null || !log.transactionHash) return false;
 
@@ -127,7 +165,8 @@ export async function applyFirewallLog(sql: Sql, firewall: string, log: Log): Pr
   if (!KNOWN.has(decoded.eventName)) return false;
 
   const args = decoded.args as Record<string, unknown>;
-  const firewallId = asId(args.firewallId);
+  const rawFirewallId = asId(args.firewallId);
+  const firewallId = rawFirewallId ? namespacedFirewallId(sourceKey, rawFirewallId) : null;
   const agentIdFromEvent = asId(args.agentId);
   if (!firewallId) throw new Error(`${decoded.eventName} is missing a firewall id`);
 
@@ -470,16 +509,38 @@ export async function syncFirewall(force = false, budgetMs?: number): Promise<In
       detail: "Agent Firewall is not deployed. No firewalls are indexed.",
     };
   }
-  const deployBlock = configuredFirewallDeployBlock();
-  if (deployBlock == null) {
+  if (configuredFirewallDeployBlock() == null) {
     return {
       status: "error",
       detail:
         "Firewall address is set but the deployment block is unknown, so indexing has not started.",
     };
   }
+  const sources = firewallSources();
+  // The primary contract's status is what callers see; extra contracts sync alongside it and a
+  // failure there never hides primary history.
+  const [primary, ...extras] = sources;
+  const results = await Promise.all([
+    syncSource(primary, force, budgetMs),
+    ...extras.map((source) =>
+      syncSource(source, force, budgetMs).catch((err: unknown) => {
+        console.error(`[agenttrace-firewall] ${source.key}:`, err instanceof Error ? err.message : err);
+        return null;
+      }),
+    ),
+  ]);
+  const head = results[0] as IndexerStatus;
+  if (head.status !== "ok") return head;
+  // Report the slowest source so "caught up" means every contract is caught up.
+  let lastScannedBlock = head.lastScannedBlock;
+  for (const r of results.slice(1)) if (r && r.status === "ok") lastScannedBlock = Math.min(lastScannedBlock, r.lastScannedBlock);
+  return { ...head, lastScannedBlock };
+}
 
-  const state = syncSlot();
+async function syncSource(source: FirewallSource, force: boolean, budgetMs?: number): Promise<IndexerStatus> {
+  const firewall = source.address;
+  const deployBlock = source.deployBlock;
+  const state = syncSlot(source.key);
   const now = Date.now();
   if (!force && state.last && state.at && now - state.at < SYNC_INTERVAL_MS) return state.last;
   if (state.inflight) return state.inflight;
@@ -500,7 +561,7 @@ export async function syncFirewall(force = false, budgetMs?: number): Promise<In
             },
           ]
         : []),
-      { key, address: firewall, apply: (log: Log) => applyFirewallLog(sql, firewall, log) },
+      { key, address: firewall, apply: (log: Log) => applyFirewallLog(sql, firewall, log, source.key) },
     ]);
     const latest = Number(await client.getBlockNumber());
     if (deployBlock > latest)
@@ -519,7 +580,7 @@ export async function syncFirewall(force = false, budgetMs?: number): Promise<In
       address: firewall,
       from,
       latest,
-      apply: (log) => applyFirewallLog(sql, firewall, log),
+      apply: (log) => applyFirewallLog(sql, firewall, log, source.key),
       saveCursor: async (to) => {
         await sql`
           insert into indexer_state (chain_id, contract_address, last_scanned_block, updated_at)
@@ -572,7 +633,7 @@ export async function syncFirewallSafe(): Promise<IndexerStatus> {
       status: "error",
       detail: err instanceof Error ? err.message : "Firewall indexer failed",
     };
-    const state = syncSlot();
+    const state = syncSlot("");
     state.last = result;
     state.at = Date.now();
     return result;
@@ -826,7 +887,9 @@ export async function ingestFirewallReceipt(
       error: "Transaction reverted on Monad. The firewall was not changed.",
     };
   }
-  const logs = receipt.logs.filter((log) => log.address.toLowerCase() === firewall);
+  const sources = firewallSources();
+  const sourceOf = (address: string) => sources.find((src) => src.address === address.toLowerCase());
+  const logs = receipt.logs.filter((log) => sourceOf(log.address));
   if (!logs.length) {
     return {
       state: "empty",
@@ -837,19 +900,19 @@ export async function ingestFirewallReceipt(
   const executions = new Set<string>();
   for (const log of logs) {
     try {
-      await applyFirewallLog(sql, firewall, log);
+      await applyFirewallLog(sql, log.address.toLowerCase(), log, sourceOf(log.address)?.key ?? "");
     } catch (err) {
       // This instance has not indexed the firewall yet (serverless instances do not share a
       // database). Catch the indexer up to the block before this receipt, then apply again.
       if (!(err instanceof Error && /unknown firewall/.test(err.message))) throw err;
       await catchUpFirewall(Number(receipt.blockNumber) - 1);
-      await applyFirewallLog(sql, firewall, log);
+      await applyFirewallLog(sql, log.address.toLowerCase(), log, sourceOf(log.address)?.key ?? "");
     }
     try {
       const decoded = decodeEventLog({ abi: agentFirewallAbi, data: log.data, topics: log.topics });
       const args = decoded.args as { firewallId?: unknown; executionId?: unknown };
       const firewallId = asId(args.firewallId);
-      if (firewallId) ids.add(firewallId);
+      if (firewallId) ids.add(namespacedFirewallId(sourceOf(log.address)?.key ?? "", firewallId));
       if (decoded.eventName === "AgentAction" && typeof args.executionId === "string") {
         executions.add(args.executionId.toLowerCase());
       }

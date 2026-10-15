@@ -1,3 +1,4 @@
+import { isFirewallRef } from "@/lib/chain/firewall-sources";
 import { createServerFn } from "@tanstack/react-start";
 import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
@@ -821,7 +822,7 @@ export const confirmFirewallTx = createServerFn({ method: "POST" })
     if (!input || typeof input.txHash !== "string" || !/^0x[a-fA-F0-9]{64}$/.test(input.txHash)) {
       throw new Error("Invalid transaction hash.");
     }
-    if (input.firewallId != null && !/^[1-9]\d*$/.test(input.firewallId)) {
+    if (input.firewallId != null && !isFirewallRef(input.firewallId)) {
       throw new Error("Invalid firewall id.");
     }
     return { txHash: input.txHash as `0x${string}`, firewallId: input.firewallId };
@@ -865,7 +866,7 @@ export const confirmSetupTx = createServerFn({ method: "POST" })
   });
 
 export const readDemoState = createServerFn({ method: "GET" })
-  .validator((firewallId: string) => (firewallId && !/^[1-9]\d*$/.test(firewallId) ? "" : firewallId))
+  .validator((firewallId: string) => (firewallId && !isFirewallRef(firewallId) ? "" : firewallId))
   .handler(async ({ data }) => readDemoFirewall(data));
 
 export const verifyDemoDeposit = createServerFn({ method: "POST" })
