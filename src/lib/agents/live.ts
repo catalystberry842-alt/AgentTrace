@@ -29,6 +29,8 @@ export const getLiveStats = createServerFn({ method: "GET" }).handler(async (): 
 export const verifyOnchain = createServerFn({ method: "POST" })
   .validator((id: string) => String(id ?? "").trim().slice(0, 80))
   .handler(async ({ data }): Promise<VerifyResult> => {
+    const { enforceRateLimit } = await import("@/lib/rate-limit.server");
+    enforceRateLimit("verifyOnchain", 20);
     const { recomputeProof } = await import("@/lib/chain/stats.server");
     return recomputeProof(data);
   });

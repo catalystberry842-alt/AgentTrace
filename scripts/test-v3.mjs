@@ -173,6 +173,40 @@ ok(await call(alice, fw, fwAbi, "setExecutor", [1n, hex(session)]), fwAbi, "setE
 assert.equal(ok(await call(alice, fw, fwAbi, "getExecutorValidUntil", [1n]), fwAbi, "getExecutorValidUntil"), 0n, "setExecutor clears the expiry");
 now = 10n ** 9n;
 ok(await call(session, fw, fwAbi, "execute", [1n, tokenAddr, 0n, claimData]), fwAbi, "execute");
+
+// --- Token caps, recipient allowlists, target re-enable --------------------------------------
+{
+  // Agent 2 (bob) allowed claim + transfer at setup. Fund its vault, then bound transfer.
+  const v2Addr = createAddressFromString(vault2);
+  ok(await call(exec, fw, fwAbi, "execute", [2n, tokenAddr, 0n, encodeFunctionData({ abi: tokenAbi, functionName: "claim", args: [1_000n] })]), fwAbi, "execute");
+  const xfer = (to, amt) => encodeFunctionData({ abi: tokenAbi, functionName: "transfer", args: [to, amt] });
+  ok(await call(bob, fw, fwAbi, "setArgCap", [2n, tokenAddr, transfer, 1, 100n]), fwAbi, "setArgCap");
+  assert.equal(err(await call(bob, fw, fwAbi, "setArgPeriodCap", [2n, tokenAddr, claim, 1n])).errorName, "ArgCapNotSet");
+  ok(await call(bob, fw, fwAbi, "setArgPeriodCap", [2n, tokenAddr, transfer, 150n]), fwAbi, "setArgPeriodCap");
+  ok(await call(bob, fw, fwAbi, "setRecipientRule", [2n, tokenAddr, transfer, true, 0]), fwAbi, "setRecipientRule");
+  ok(await call(bob, fw, fwAbi, "setRecipientAllowed", [2n, tokenAddr, transfer, hex(bob), true]), fwAbi, "setRecipientAllowed");
+  assert.equal(err(await call(exec, fw, fwAbi, "execute", [2n, tokenAddr, 0n, xfer(hex(exec), 10n)])).errorName, "RecipientNotAllowed", "recipient allowlist enforced");
+  ok(await call(exec, fw, fwAbi, "execute", [2n, tokenAddr, 0n, xfer(hex(bob), 100n)]), fwAbi, "execute");
+  assert.equal(err(await call(exec, fw, fwAbi, "execute", [2n, tokenAddr, 0n, xfer(hex(bob), 60n)])).errorName, "ArgumentPeriodLimitExceeded", "running total capped");
+  ok(await call(exec, fw, fwAbi, "execute", [2n, tokenAddr, 0n, xfer(hex(bob), 50n)]), fwAbi, "execute");
+  now += 86_400n;
+  ok(await call(exec, fw, fwAbi, "execute", [2n, tokenAddr, 0n, xfer(hex(bob), 100n)]), fwAbi, "execute");
+  assert.equal(await tokenBal(hex(bob)), 250n);
+  assert.equal(await tokenBal(vault2), 750n);
+  void v2Addr;
+
+  // Disabling the target clears its functions and rules; re-allowing it restores nothing.
+  ok(await call(bob, fw, fwAbi, "disableTarget", [2n, tokenAddr]), fwAbi, "disableTarget");
+  ok(await call(bob, fw, fwAbi, "allowTarget", [2n, tokenAddr, "Token"]), fwAbi, "allowTarget");
+  assert.equal(ok(await call(bob, fw, fwAbi, "isFunctionAllowed", [2n, tokenAddr, transfer]), fwAbi, "isFunctionAllowed"), false);
+  assert.equal(ok(await call(bob, fw, fwAbi, "getArgCap", [2n, tokenAddr, transfer]), fwAbi, "getArgCap").enabled, false);
+  assert.equal(ok(await call(bob, fw, fwAbi, "getRecipientRule", [2n, tokenAddr, transfer]), fwAbi, "getRecipientRule").enabled, false);
+  assert.equal(err(await call(exec, fw, fwAbi, "execute", [2n, tokenAddr, 0n, xfer(hex(bob), 1n)])).errorName, "FunctionNotAllowed");
+  // AgentAction is logged before the external call.
+  ok(await call(bob, fw, fwAbi, "allowFunction", [2n, tokenAddr, claim]), fwAbi, "allowFunction");
+  const ex2 = await call(exec, fw, fwAbi, "execute", [2n, tokenAddr, 0n, encodeFunctionData({ abi: tokenAbi, functionName: "claim", args: [1n] })]);
+  assert.ok(events(ex2).some((e) => e.eventName === "AgentAction"));
+}
 console.log("v3 firewall tests ok (vault custody, session executors, one-transaction setup)");
 
 // --- AgentProofQuorum --------------------------------------------------------------------------
@@ -226,4 +260,43 @@ assert.equal(err(await call(bob, quorum, qAbi, "addVerifier", [hex(bob)]), qAbi)
 ok(await call(alice, quorum, qAbi, "removeVerifier", [hex(v3)]), qAbi, "removeVerifier");
 assert.equal(err(await call(alice, quorum, qAbi, "removeVerifier", [hex(v2)]), qAbi).errorName, "InvalidThreshold");
 assert.equal(err(await call(alice, quorum, qAbi, "setThreshold", [0n]), qAbi).errorName, "InvalidThreshold");
-console.log("quorum tests ok (threshold anchoring, conflicts, challenges, revocation)");
+
+// Removed verifiers stop counting: they can withdraw, and anyone can prune their attestations.
+{
+  const exC = h(0xc7), hashC = h(0xcc);
+  ok(await call(alice, quorum, qAbi, "addVerifier", [hex(v3)]), qAbi, "addVerifier");
+  ok(await call(v1, quorum, qAbi, "attest", [hashC, exC, 1n, 1n, txA]), qAbi, "attest");
+  ok(await call(v3, quorum, qAbi, "attest", [hashC, exC, 1n, 1n, txA]), qAbi, "attest");
+  assert.equal(ok(await call(alice, quorum, qAbi, "isAnchored", [exC]), qAbi, "isAnchored"), true);
+  assert.equal(err(await call(bob, quorum, qAbi, "pruneAttestation", [exC, hex(v3)]), qAbi).errorName, "StillVerifier");
+  ok(await call(alice, quorum, qAbi, "removeVerifier", [hex(v3)]), qAbi, "removeVerifier");
+  const pr = await call(bob, quorum, qAbi, "pruneAttestation", [exC, hex(v3)]);
+  assert.deepEqual(events(pr, qAbi).map((e) => e.eventName), ["AttestationPruned", "ProofRevoked"]);
+  assert.equal(ok(await call(alice, quorum, qAbi, "getExecution", [exC]), qAbi, "getExecution").attestations, 1);
+  // A removed verifier can still withdraw its own attestation.
+  const exD = h(0xd1);
+  ok(await call(alice, quorum, qAbi, "addVerifier", [hex(v3)]), qAbi, "addVerifier");
+  ok(await call(v3, quorum, qAbi, "attest", [h(0xdd), exD, 1n, 1n, txA]), qAbi, "attest");
+  ok(await call(alice, quorum, qAbi, "removeVerifier", [hex(v3)]), qAbi, "removeVerifier");
+  ok(await call(v3, quorum, qAbi, "withdrawAttestation", [exD, "key rotated"]), qAbi, "withdrawAttestation");
+  assert.equal(ok(await call(alice, quorum, qAbi, "getExecution", [exD]), qAbi, "getExecution").attestations, 0);
+}
+
+// The owner can clear a dispute; the execution then anchors in a fresh round.
+{
+  assert.equal(err(await call(bob, quorum, qAbi, "resolveDispute", [exB, "x"]), qAbi).errorName, "Unauthorized");
+  assert.equal(err(await call(alice, quorum, qAbi, "resolveDispute", [exA, "x"]), qAbi).errorName, "NotDisputed");
+  ok(await call(alice, quorum, qAbi, "resolveDispute", [exB, "v2 key removed"]), qAbi, "resolveDispute");
+  assert.equal(ok(await call(alice, quorum, qAbi, "round", [exB]), qAbi, "round"), 1n);
+  ok(await call(v1, quorum, qAbi, "attest", anchorArgs(h(0xb0), exB)), qAbi, "attest");
+  const again = await call(v2, quorum, qAbi, "attest", anchorArgs(h(0xb0), exB));
+  assert.ok(events(again, qAbi).some((e) => e.eventName === "ExecutionProofAnchored"), "re-anchored after resolution");
+}
+
+// Ownership is two-step.
+ok(await call(alice, quorum, qAbi, "transferOwnership", [hex(bob)]), qAbi, "transferOwnership");
+assert.equal(ok(await call(alice, quorum, qAbi, "owner"), qAbi, "owner").toLowerCase(), hex(alice));
+assert.equal(err(await call(exec, quorum, qAbi, "acceptOwnership"), qAbi).errorName, "Unauthorized");
+ok(await call(bob, quorum, qAbi, "acceptOwnership"), qAbi, "acceptOwnership");
+assert.equal(ok(await call(alice, quorum, qAbi, "owner"), qAbi, "owner").toLowerCase(), hex(bob));
+console.log("quorum tests ok (threshold anchoring, conflicts, challenges, revocation, pruning, dispute resolution, two-step owner)");

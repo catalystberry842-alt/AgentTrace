@@ -88,6 +88,7 @@ const agent = await agenttrace.agents.create({
 | `proofs.get` / `verify` / `waitForVerification` | `GET` and `POST /api/v1/proofs/:executionId` |
 | `outcomes.get` / `verify` | `GET` and `POST /api/v1/outcomes/:executionId` |
 | `webhooks.verifySignature` | Local HMAC check. No network call. |
+| `webhooks.verifyWebhook` | Recommended. Checks `X-AgentTrace-Signature-V2` (`t=<unix>,v1=<hmac of "t.body">`) and rejects deliveries older than 5 minutes (replay protection). Also de-duplicate on the event `id`. |
 
 `waitForVerification` polls with backoff and stops at the timeout (default 30s, max 120s). It does not report `receipt_verified` unless the API does.
 

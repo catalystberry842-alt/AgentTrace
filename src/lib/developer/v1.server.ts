@@ -397,7 +397,7 @@ export async function postWebhook(request: Request, ctx: ApiContext): Promise<Re
   if (!body.ok) return body.response;
   const raw = body.value as { url?: unknown; events?: unknown };
   const url = typeof raw.url === "string" ? parseWebhookUrl(raw.url) : null;
-  if (!url) return apiError(400, "INVALID_REQUEST", "Webhook URL must be https, or http on localhost.");
+  if (!url) return apiError(400, "INVALID_REQUEST", "Webhook URL must be a public https URL (http on localhost only in development).");
   const events = parseWebhookEvents(raw.events);
   if (!events) return apiError(400, "INVALID_REQUEST", "Choose at least one supported webhook event.");
   try {

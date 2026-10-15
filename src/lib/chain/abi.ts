@@ -1651,6 +1651,11 @@ export const agentProofAbi = [
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "ZeroValue",
+    "type": "error"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {

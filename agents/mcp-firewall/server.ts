@@ -52,12 +52,12 @@ const tools = [
   {
     name: "demo_deposit",
     description: "Deposit an amount into DemoProtocol for this agent. Runs through the AgentTrace firewall and returns the verified proof.",
-    inputSchema: { type: "object", properties: { amount: { type: "integer", minimum: 1 } }, required: ["amount"] },
+    inputSchema: { type: "object", properties: { amount: { type: ["integer", "string"], description: "positive integer; pass large values as a decimal string" } }, required: ["amount"] },
   },
   {
     name: "demo_withdraw",
     description: "Withdraw an amount from DemoProtocol for this agent. Runs through the AgentTrace firewall.",
-    inputSchema: { type: "object", properties: { amount: { type: "integer", minimum: 1 } }, required: ["amount"] },
+    inputSchema: { type: "object", properties: { amount: { type: ["integer", "string"], description: "positive integer; pass large values as a decimal string" } }, required: ["amount"] },
   },
   {
     name: "call_contract",
@@ -115,7 +115,9 @@ async function callTool(name: string, args: Record<string, unknown>) {
     });
   }
   if (name === "demo_deposit" || name === "demo_withdraw") {
-    const amount = BigInt(Number(args.amount ?? 0));
+    const rawAmount = String(args.amount ?? "0");
+    if (!/^\d+$/.test(rawAmount)) return text("amount must be a positive integer.", true);
+    const amount = BigInt(rawAmount);
     if (amount < 1n) return text("amount must be a positive integer.", true);
     const functionName = name === "demo_deposit" ? "deposit" : "withdraw";
     return guarded(DEMO, encodeFunctionData({ abi: demoAbi, functionName, args: [agentId, amount] }));

@@ -75,6 +75,7 @@ The key is sent as a bearer token. A key that contains `?` is rejected so it is 
 | `outcomes.get` | `GET /api/v1/outcomes/:executionId` |
 | `outcomes.verify` | `POST /api/v1/outcomes/:executionId/verify` |
 | `webhooks.verifySignature` | Local HMAC check. No request. |
+| `webhooks.verifyWebhook` | Recommended. Checks `X-AgentTrace-Signature-V2` (`t=<unix>,v1=<hmac of "t.body">`) and rejects deliveries older than 5 minutes (replay protection). Also de-duplicate on the event `id`. |
 
 `agents.create` confirms an agent only when the body includes a real `transactionHash` and the receipt contains `AgentRegistered`. Until the registry is deployed, the call returns `failed` with a null agent id and a null transaction hash.
 

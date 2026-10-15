@@ -87,6 +87,26 @@ contract AgentFirewallV3 {
         bytes4[] selectors;
     }
 
+    /// @dev Per-period ceiling on the capped argument (e.g. a token amount), summed across calls.
+    struct ArgPeriodCap {
+        uint256 maxPerPeriod;
+        uint256 spentInPeriod;
+        uint64 periodStart;
+    }
+
+    /// @dev Restricts an address argument (e.g. a transfer/approve recipient) to an allowlist.
+    struct RecipientRule {
+        bool enabled;
+        uint8 argIndex;
+    }
+
+    mapping(uint256 => mapping(address => mapping(bytes4 => ArgPeriodCap))) private _argPeriodCaps;
+    mapping(uint256 => mapping(address => mapping(bytes4 => RecipientRule))) private _recipientRules;
+    mapping(uint256 => mapping(address => mapping(bytes4 => mapping(address => bool)))) private _recipients;
+    /// @dev Selectors ever allowed per target, so disabling a target clears all of them.
+    mapping(uint256 => mapping(address => bytes4[])) private _selectorList;
+    mapping(uint256 => mapping(address => mapping(bytes4 => bool))) private _selectorListed;
+
     mapping(uint256 => address) private _vaults;
     mapping(uint256 => uint64) private _executorValidUntil;
 
@@ -116,6 +136,9 @@ contract AgentFirewallV3 {
     error InvalidExpiry();
     error GasStipendFailed(address executor);
     error AttachedValueMismatch(uint256 attached, uint256 declared);
+    error ArgumentPeriodLimitExceeded(uint256 firewallId, bytes4 selector, uint256 value, uint256 maxPerPeriod);
+    error RecipientNotAllowed(uint256 firewallId, bytes4 selector, address recipient);
+    error InvalidRecipient();
 
     event FirewallCreated(
         uint256 indexed firewallId,
@@ -198,6 +221,10 @@ contract AgentFirewallV3 {
     event ExecutorGasFunded(uint256 indexed firewallId, address indexed executor, uint256 amount, uint64 timestamp);
 
     event ArgCapCleared(uint256 indexed firewallId, uint256 indexed agentId, address target, bytes4 selector, uint64 timestamp);
+
+    event ArgPeriodCapSet(uint256 indexed firewallId, address target, bytes4 selector, uint256 maxPerPeriod, uint64 timestamp);
+    event RecipientRuleSet(uint256 indexed firewallId, address target, bytes4 selector, bool enabled, uint8 argIndex, uint64 timestamp);
+    event RecipientAllowed(uint256 indexed firewallId, address target, bytes4 selector, address recipient, bool allowed, uint64 timestamp);
 
     event FirewallPaused(uint256 indexed firewallId, uint256 indexed agentId, uint64 timestamp);
     event FirewallUnpaused(uint256 indexed firewallId, uint256 indexed agentId, uint64 timestamp);
@@ -415,6 +442,18 @@ contract AgentFirewallV3 {
         if (!info.exists) revert TargetNotAllowed(firewallId, target);
         if (!info.active) revert TargetInactive(firewallId, target);
         info.active = false;
+        // Re-allowing the target later must not silently restore old permissions or caps.
+        bytes4[] storage selectors = _selectorList[firewallId][target];
+        for (uint256 i = 0; i < selectors.length; i++) {
+            bytes4 sel = selectors[i];
+            if (_functions[firewallId][target][sel]) {
+                _functions[firewallId][target][sel] = false;
+                emit FunctionDisabled(firewallId, fw.agentId, target, sel, uint64(block.timestamp));
+            }
+            _clearRules(firewallId, target, sel);
+            delete _selectorListed[firewallId][target][sel];
+        }
+        delete _selectorList[firewallId][target];
         emit TargetDisabled(firewallId, fw.agentId, target, uint64(block.timestamp));
     }
 
@@ -430,6 +469,10 @@ contract AgentFirewallV3 {
         if (!info.active) revert TargetInactive(firewallId, target);
         if (_functions[firewallId][target][selector]) return;
         _functions[firewallId][target][selector] = true;
+        if (!_selectorListed[firewallId][target][selector]) {
+            _selectorListed[firewallId][target][selector] = true;
+            _selectorList[firewallId][target].push(selector);
+        }
         emit FunctionAllowed(firewallId, agentId, target, selector, uint64(block.timestamp));
     }
 
@@ -437,12 +480,62 @@ contract AgentFirewallV3 {
         Firewall storage fw = _owned(firewallId);
         if (!_functions[firewallId][target][selector]) revert FunctionNotAllowed(firewallId, target, selector);
         _functions[firewallId][target][selector] = false;
+        _clearRules(firewallId, target, selector);
         emit FunctionDisabled(firewallId, fw.agentId, target, selector, uint64(block.timestamp));
+    }
+
+    function _clearRules(uint256 firewallId, address target, bytes4 selector) private {
+        delete _argCaps[firewallId][target][selector];
+        delete _argPeriodCaps[firewallId][target][selector];
+        delete _recipientRules[firewallId][target][selector];
+    }
+
+    /// @notice Cap the SUM of the capped argument across calls per policy period (e.g. total token
+    ///         amount moved per day). Requires setArgCap first; 0 removes the period cap.
+    function setArgPeriodCap(uint256 firewallId, address target, bytes4 selector, uint256 maxPerPeriod) external {
+        _owned(firewallId);
+        if (!_argCaps[firewallId][target][selector].enabled) revert ArgCapNotSet(firewallId, target, selector);
+        _argPeriodCaps[firewallId][target][selector] = ArgPeriodCap({
+            maxPerPeriod: maxPerPeriod,
+            spentInPeriod: 0,
+            periodStart: uint64(block.timestamp)
+        });
+        emit ArgPeriodCapSet(firewallId, target, selector, maxPerPeriod, uint64(block.timestamp));
+    }
+
+    function getArgPeriodCap(uint256 firewallId, address target, bytes4 selector) external view returns (ArgPeriodCap memory) {
+        return _argPeriodCaps[firewallId][target][selector];
+    }
+
+    /// @notice Require the address argument at argIndex (e.g. a transfer or approve recipient) to be
+    ///         on this function's recipient allowlist. enabled=false removes the rule.
+    function setRecipientRule(uint256 firewallId, address target, bytes4 selector, bool enabled, uint8 argIndex) external {
+        _owned(firewallId);
+        if (!_functions[firewallId][target][selector]) revert FunctionNotAllowed(firewallId, target, selector);
+        _recipientRules[firewallId][target][selector] = RecipientRule({enabled: enabled, argIndex: argIndex});
+        emit RecipientRuleSet(firewallId, target, selector, enabled, argIndex, uint64(block.timestamp));
+    }
+
+    function setRecipientAllowed(uint256 firewallId, address target, bytes4 selector, address recipient, bool allowed) external {
+        _owned(firewallId);
+        if (recipient == address(0)) revert InvalidRecipient();
+        _recipients[firewallId][target][selector][recipient] = allowed;
+        emit RecipientAllowed(firewallId, target, selector, recipient, allowed, uint64(block.timestamp));
+    }
+
+    function getRecipientRule(uint256 firewallId, address target, bytes4 selector) external view returns (RecipientRule memory) {
+        return _recipientRules[firewallId][target][selector];
+    }
+
+    function isRecipientAllowed(uint256 firewallId, address target, bytes4 selector, address recipient) external view returns (bool) {
+        return _recipients[firewallId][target][selector][recipient];
     }
 
     /// @notice Cap one static uint256 argument (0-based index after the selector) of an allowed function.
     ///         execute reverts with ArgumentTooHigh when the word at that index is above maxValue.
     ///         One cap per (target, selector); setting again replaces it.
+    ///         Note: this caps one call. Use setArgPeriodCap for a running total and setRecipientRule
+    ///         to restrict who can receive, e.g. for ERC-20 transfer/approve.
     function setArgCap(uint256 firewallId, address target, bytes4 selector, uint8 argIndex, uint256 maxValue) external {
         Firewall storage fw = _owned(firewallId);
         if (!_functions[firewallId][target][selector]) revert FunctionNotAllowed(firewallId, target, selector);
@@ -510,6 +603,26 @@ contract AgentFirewallV3 {
             if (data.length < offset + 32) revert ArgumentMissing(firewallId, selector, cap.argIndex);
             uint256 argValue = uint256(bytes32(data[offset:offset + 32]));
             if (argValue > cap.maxValue) revert ArgumentTooHigh(firewallId, selector, cap.argIndex, argValue, cap.maxValue);
+            ArgPeriodCap storage pc = _argPeriodCaps[firewallId][target][selector];
+            if (pc.maxPerPeriod != 0) {
+                uint256 duration = uint256(_policies[firewallId].periodDuration);
+                if (block.timestamp >= uint256(pc.periodStart) + duration) {
+                    pc.spentInPeriod = 0;
+                    pc.periodStart = uint64(block.timestamp);
+                }
+                uint256 nextArgSpent = pc.spentInPeriod + argValue;
+                if (nextArgSpent > pc.maxPerPeriod) revert ArgumentPeriodLimitExceeded(firewallId, selector, argValue, pc.maxPerPeriod);
+                pc.spentInPeriod = nextArgSpent;
+            }
+        }
+        RecipientRule storage rule = _recipientRules[firewallId][target][selector];
+        if (rule.enabled) {
+            uint256 rOffset = 4 + uint256(rule.argIndex) * 32;
+            if (data.length < rOffset + 32) revert ArgumentMissing(firewallId, selector, rule.argIndex);
+            uint256 word = uint256(bytes32(data[rOffset:rOffset + 32]));
+            if (word >> 160 != 0) revert RecipientNotAllowed(firewallId, selector, address(0));
+            address recipient = address(uint160(word));
+            if (!_recipients[firewallId][target][selector][recipient]) revert RecipientNotAllowed(firewallId, selector, recipient);
         }
         if (msg.value != value) revert AttachedValueMismatch(msg.value, value);
 
@@ -532,9 +645,8 @@ contract AgentFirewallV3 {
         bytes32 executionId = keccak256(abi.encode(firewallId, fw.agentId, fw.executor, nonce, target, selector));
         fw.executionNonce = nonce + 1;
 
-        // The vault is msg.sender at the target; a target revert bubbles up unchanged.
-        AgentVault(payable(_vaults[firewallId])).forward{value: value}(target, data);
-
+        // Emitted before the external call so nested executions (a target calling back into
+        // execute) still log in nonce order. A target revert rolls the event back too.
         emit AgentAction(
             fw.agentId,
             firewallId,
@@ -547,6 +659,9 @@ contract AgentFirewallV3 {
             keccak256(data),
             uint64(block.timestamp)
         );
+
+        // The vault is msg.sender at the target; a target revert bubbles up unchanged.
+        AgentVault(payable(_vaults[firewallId])).forward{value: value}(target, data);
     }
 
     function getFirewall(uint256 firewallId) external view returns (Firewall memory fw) {

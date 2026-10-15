@@ -36,8 +36,9 @@ contract AgentVault {
     }
 
     /// @notice The agent owner moves assets out of the vault (or calls anything as the vault).
-    ///         The owner is read live from the registry through the firewall, so a transferred
-    ///         agent identity moves vault control with it.
+    ///         The owner is read live from the registry through the firewall on every call.
+    ///         AgentRegistry has no transfer function today, so this is the registering wallet;
+    ///         a future registry that supports transfers would move vault control with it.
     function ownerCall(address target, uint256 value, bytes calldata data) external payable returns (bytes memory) {
         address owner = IAgentVaultFirewall(firewall).vaultOwner(firewallId);
         if (msg.sender != owner) revert OnlyOwner(msg.sender);

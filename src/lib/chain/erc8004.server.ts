@@ -35,6 +35,21 @@ import { hypersyncEnabled, hypersyncQuery } from "@/lib/chain/hypersync.server";
 
 const LINKS = "erc8004Links";
 const TXS = "erc8004Txs";
+/** Exact feedback documents committed onchain, keyed by executionId (the hash preimages). */
+const FEEDBACK_DOCS = "erc8004FeedbackDocs";
+
+/**
+ * The document to serve at feedbackURI. Prefers the bytes pinned when the feedback was posted, so
+ * a later re-verification of the outcome cannot change what the committed hash points at. Falls
+ * back to rebuilding it (feedback posted before pinning existed hashes this same rebuild).
+ */
+export async function feedbackDocument(executionId: string): Promise<string | null> {
+  const pinned = (await cachedKv(FEEDBACK_DOCS).catch(() => ({}) as Record<string, string>))[executionId.toLowerCase()];
+  if (pinned) return pinned;
+  const outcome = await getOutcomeByExecution(executionId).catch(() => null);
+  if (!outcome || (outcome.status !== "verified" && outcome.status !== "failed")) return null;
+  return outcomeFeedbackJson(executionId, outcome);
+}
 
 export function appUrl(): string {
   const explicit = process.env.APP_URL?.trim();
@@ -226,7 +241,10 @@ export async function publishExecution(executionId: string): Promise<PublishResu
     if (existing && existing[0].length > 0) {
       out.feedback = { state: "posted", txHash: txs[`feedback:${executionId}`] ?? null, value: Number(existing[2][0]) };
     } else {
-      const feedbackHash = keccak256(toBytes(outcomeFeedbackJson(executionId, outcome)));
+      const feedbackDoc = outcomeFeedbackJson(executionId, outcome);
+      const feedbackHash = keccak256(toBytes(feedbackDoc));
+      // Pin the preimage before sending, so the served bytes always match what gets committed.
+      await recordKv(FEEDBACK_DOCS, executionId.toLowerCase(), feedbackDoc);
       const hash = await wallet.writeContract({
         address: erc8004.reputation,
         abi: reputationRegistryAbi,

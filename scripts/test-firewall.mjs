@@ -222,6 +222,11 @@ assert.equal(
   reverted(await call(alice, firewall, firewallAbi, "allowTarget", [1n, "0x0000000000000000000000000000000000000000", "no"]), firewallAbi),
   "InvalidTarget",
 );
+// The firewall itself can never be a target (every variant).
+assert.equal(
+  reverted(await call(alice, firewall, firewallAbi, "allowTarget", [1n, bytesToHex(firewall.bytes), "self"]), firewallAbi),
+  "InvalidTarget",
+);
 assert.equal(eventsOf(await call(alice, firewall, firewallAbi, "allowTarget", [1n, echoAddr, "Echo"]))[0].eventName, "TargetAllowed");
 assert.equal(
   reverted(await call(bob, firewall, firewallAbi, "execute", [1n, echoAddr, 0n, pingData]), firewallAbi),
@@ -301,7 +306,8 @@ assert.equal(
   (await call(bob, firewall, firewallAbi, "execute", [1n, echoAddr, 0n, pingData], { timestamp: 1_260n })).execResult.exceptionError,
   undefined,
 );
-assert.equal(eventsOf(await call(alice, firewall, firewallAbi, "disableTarget", [1n, echoAddr]))[0].eventName, "TargetDisabled");
+// V3 also emits FunctionDisabled for each selector it clears before TargetDisabled.
+assert.ok(eventsOf(await call(alice, firewall, firewallAbi, "disableTarget", [1n, echoAddr])).some((e) => e.eventName === "TargetDisabled"));
 assert.equal(
   reverted(await call(bob, firewall, firewallAbi, "execute", [1n, echoAddr, 0n, pingData]), firewallAbi),
   "TargetInactive",

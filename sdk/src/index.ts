@@ -6,7 +6,7 @@ import { Firewalls } from "./firewalls/firewalls.ts";
 import { Outcomes } from "./outcomes/outcomes.ts";
 import { Proofs } from "./proofs/proofs.ts";
 import type { AgentTraceOptions } from "./types/index.ts";
-import { verifySignature } from "./webhooks/verify.ts";
+import { verifySignature, verifyWebhook } from "./webhooks/verify.ts";
 import { traceCall, TRACE_NETWORKS } from "./trace/trace.ts";
 export type { TraceCallInput, TraceCallResult, TraceNetwork } from "./trace/trace.ts";
 export { enforceLimits, validateLimits, type AmountLimit } from "./trace/policy.ts";
@@ -17,7 +17,7 @@ export class AgentTrace {
   readonly executions: Executions;
   readonly proofs: Proofs;
   readonly outcomes: Outcomes;
-  readonly webhooks: { verifySignature: typeof verifySignature };
+  readonly webhooks: { verifySignature: typeof verifySignature; verifyWebhook: typeof verifyWebhook };
 
   constructor(options: AgentTraceOptions) {
     if (options.network !== "monad-testnet") {
@@ -32,11 +32,11 @@ export class AgentTrace {
     this.executions = new Executions(http);
     this.proofs = new Proofs(http);
     this.outcomes = new Outcomes(http);
-    this.webhooks = { verifySignature };
+    this.webhooks = { verifySignature, verifyWebhook };
   }
 }
 
-export { AgentTraceError, verifySignature, traceCall, TRACE_NETWORKS };
+export { AgentTraceError, verifySignature, verifyWebhook, traceCall, TRACE_NETWORKS };
 export type {
   Agent,
   AgentTraceOptions,

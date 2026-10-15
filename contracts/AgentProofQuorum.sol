@@ -51,12 +51,15 @@ contract AgentProofQuorum {
     }
 
     address public owner;
+    address public pendingOwner;
     uint256 public threshold;
     uint256 public verifierCount;
 
     mapping(address => bool) public isVerifier;
     mapping(bytes32 executionId => Execution) private _executions;
-    mapping(bytes32 executionId => mapping(address verifier => bytes32 proofHash)) private _attested;
+    /// @dev Attestations are kept per round; resolving a dispute starts a fresh round.
+    mapping(bytes32 executionId => uint256) public round;
+    mapping(bytes32 executionId => mapping(uint256 round => mapping(address verifier => bytes32 proofHash))) private _attested;
     mapping(bytes32 proofHash => bytes32 executionId) private _byHash;
 
     error ZeroAddress();
@@ -72,8 +75,13 @@ contract AgentProofQuorum {
     error AnchorNotFound(bytes32 executionId);
     error UnknownExecution(bytes32 executionId);
     error EvidenceTooLong();
+    error NotDisputed(bytes32 executionId);
+    error StillVerifier(address verifier);
 
     event OwnerTransferred(address indexed previousOwner, address indexed newOwner);
+    event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
+    event AttestationPruned(bytes32 indexed executionId, address indexed verifier, uint64 at);
+    event DisputeResolved(bytes32 indexed executionId, uint256 newRound, string reason, uint64 at);
     event VerifierAdded(address indexed verifier, uint64 at);
     event VerifierRemoved(address indexed verifier, uint64 at);
     event ThresholdUpdated(uint256 threshold, uint64 at);
@@ -131,10 +139,18 @@ contract AgentProofQuorum {
 
     // --- Verifier set ---------------------------------------------------------------------------
 
+    /// @notice Two-step: the new owner must call acceptOwnership.
     function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) revert ZeroAddress();
-        emit OwnerTransferred(owner, newOwner);
-        owner = newOwner;
+        pendingOwner = newOwner;
+        emit OwnershipTransferStarted(owner, newOwner);
+    }
+
+    function acceptOwnership() external {
+        if (msg.sender != pendingOwner) revert Unauthorized(msg.sender);
+        emit OwnerTransferred(owner, msg.sender);
+        owner = msg.sender;
+        pendingOwner = address(0);
     }
 
     function addVerifier(address verifier) external onlyOwner {
@@ -165,7 +181,7 @@ contract AgentProofQuorum {
     ) public {
         if (!isVerifier[msg.sender]) revert Unauthorized(msg.sender);
         if (proofHash == bytes32(0) || executionId == bytes32(0) || transactionHash == bytes32(0)) revert ZeroValue();
-        if (_attested[executionId][msg.sender] != bytes32(0)) revert AlreadyAttested(executionId, msg.sender);
+        if (_attested[executionId][round[executionId]][msg.sender] != bytes32(0)) revert AlreadyAttested(executionId, msg.sender);
 
         Execution storage row = _executions[executionId];
         if (row.status == Status.Disputed) revert ExecutionDisputed(executionId);
@@ -193,7 +209,7 @@ contract AgentProofQuorum {
             return;
         }
 
-        _attested[executionId][msg.sender] = proofHash;
+        _attested[executionId][round[executionId]][msg.sender] = proofHash;
         row.attestations += 1;
         row.lastVerifier = msg.sender;
         emit ProofAttested(executionId, proofHash, msg.sender, row.attestations, threshold, nowTs);
@@ -219,18 +235,50 @@ contract AgentProofQuorum {
 
     /// @notice A verifier takes its attestation back (it re-checked and was wrong, or it agrees
     ///         with a challenge). An anchored proof that falls below threshold is Revoked.
+    ///         A verifier that was removed from the set can still withdraw its own attestations.
     function withdrawAttestation(bytes32 executionId, string calldata reason) external {
-        if (!isVerifier[msg.sender]) revert Unauthorized(msg.sender);
-        if (_attested[executionId][msg.sender] == bytes32(0)) revert NotAttested(executionId, msg.sender);
         if (bytes(reason).length > 280) revert EvidenceTooLong();
-        delete _attested[executionId][msg.sender];
+        _dropAttestation(executionId, msg.sender);
+        emit AttestationWithdrawn(executionId, msg.sender, reason, uint64(block.timestamp));
+        _checkRevoked(executionId);
+    }
+
+    /// @notice Anyone can drop an attestation made by a verifier that is no longer in the set, so a
+    ///         removed (e.g. compromised) key stops counting toward the threshold.
+    function pruneAttestation(bytes32 executionId, address verifier_) external {
+        if (isVerifier[verifier_]) revert StillVerifier(verifier_);
+        _dropAttestation(executionId, verifier_);
+        emit AttestationPruned(executionId, verifier_, uint64(block.timestamp));
+        _checkRevoked(executionId);
+    }
+
+    /// @notice Owner (multisig) clears a Disputed execution so the current verifier set can attest
+    ///         again in a fresh round. Meant to follow removing whichever verifier was wrong.
+    function resolveDispute(bytes32 executionId, string calldata reason) external onlyOwner {
+        if (bytes(reason).length > 280) revert EvidenceTooLong();
         Execution storage row = _executions[executionId];
-        row.attestations -= 1;
-        uint64 nowTs = uint64(block.timestamp);
-        emit AttestationWithdrawn(executionId, msg.sender, reason, nowTs);
+        if (row.status != Status.Disputed) revert NotDisputed(executionId);
+        if (_byHash[row.proofHash] == executionId) delete _byHash[row.proofHash];
+        uint32 challenges = row.challenges;
+        delete _executions[executionId];
+        _executions[executionId].challenges = challenges;
+        uint256 next = round[executionId] + 1;
+        round[executionId] = next;
+        emit DisputeResolved(executionId, next, reason, uint64(block.timestamp));
+    }
+
+    function _dropAttestation(bytes32 executionId, address verifier_) private {
+        uint256 r = round[executionId];
+        if (_attested[executionId][r][verifier_] == bytes32(0)) revert NotAttested(executionId, verifier_);
+        delete _attested[executionId][r][verifier_];
+        _executions[executionId].attestations -= 1;
+    }
+
+    function _checkRevoked(bytes32 executionId) private {
+        Execution storage row = _executions[executionId];
         if (row.status == Status.Anchored && row.attestations < threshold) {
             row.status = Status.Revoked;
-            emit ProofRevoked(executionId, row.proofHash, nowTs);
+            emit ProofRevoked(executionId, row.proofHash, uint64(block.timestamp));
         }
     }
 
@@ -265,7 +313,7 @@ contract AgentProofQuorum {
     }
 
     function attestationOf(bytes32 executionId, address verifier) external view returns (bytes32) {
-        return _attested[executionId][verifier];
+        return _attested[executionId][round[executionId]][verifier];
     }
 
     /// @notice AgentProof exposes a single `verifier`; here it is the owner-managed set. Kept so
