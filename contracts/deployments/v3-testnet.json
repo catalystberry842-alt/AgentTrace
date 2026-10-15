@@ -14,7 +14,10 @@
     "executeDeposit100": "0xf4ca72144b074a0f24b2a2bca04219dd6b6df727184e8719e40beaf473427878",
     "fundSecondVerifier": "0xf95be61cd49e571e7ae7ed2551ab106831835f65204648f1931418f70648b245",
     "attestVerifierA": "0x0d83886bd15b5cac7fa29a83cc4d9038dee555b0f780f00485e010afc7552d41",
-    "attestVerifierB": "0x3f1a496bfd1e5cb7cbd1b8f7dedefb4b40070ee8ff198a96fd391984eda50036"
+    "attestVerifierB": "0x3f1a496bfd1e5cb7cbd1b8f7dedefb4b40070ee8ff198a96fd391984eda50036",
+    "deployAgentProofQuorumV2": "0xc7516104589c01644148425767b7c94665ebe1265d71e6b66b561da987dd5f4a",
+    "executeDeposit100b": "0x1587f6698d2c9bf8ebf603cded5ee7c6acbbb57e29c98b4ada0de0f3dee476a8",
+    "attestVerifierBQuorumV2": "0x0b70ff2e83252620d0bc4034a7afea2bff614d2b066ac4dfb93b8d611c89b456"
   },
   "agentFirewallV3": "0x6866040a69ddee3570da63df02a006764f73ceca",
   "agentFirewallV3DeployBlock": 71337644,
@@ -38,7 +41,10 @@
     "registerAgent": "298885",
     "createFirewallWithPermissions": "995624",
     "attestVerifierA": "258514",
-    "attestVerifierB": "119956"
+    "attestVerifierB": "119956",
+    "deployAgentProofQuorumV2": "1426426",
+    "executeDeposit100b": "215423",
+    "attestVerifierBQuorumV2": "271033"
   },
   "migrated": {
     "agentId": "14",
@@ -55,5 +61,20 @@
     "executionId": "0xdff66b6ff4c8bcd3d3bdfd0caac4591d6c0687a455f22e89b74560598c332174",
     "proofHash": "0xb02b3547c2075b0de51ff18f6efab8a3bd0d604c50e73079f8c41a854b85db23",
     "verifyProof": "PASS"
+  },
+  "quorumV2": {
+    "address": "0x52f2b0e61a4b4ebac94d76e1fa61c7ec9460b025",
+    "deployBlock": 71354384,
+    "verifiers": [
+      "0x77a55a4980769F543Ea5Bb799F4f49A8c1Cd0D85",
+      "0xfF64E90dF724F7b59EC32a7d17baE9f1AbfD8642",
+      "0x27539724E40c434B103937ad27EE6Dac327B5FF8"
+    ],
+    "threshold": 2,
+    "replaces": "0x015c6943c80f3864f8adc1f5248c3ab6aaded016",
+    "executionTx": "0x1587f6698d2c9bf8ebf603cded5ee7c6acbbb57e29c98b4ada0de0f3dee476a8",
+    "executionId": "0xffd41da56d4bec3dd1f7774c0e12895554d62a2de8851db09d77361e312dd058",
+    "proofHash": "0xa8fdbe70c728f98573c01c645b30564a770980d2caa316e4c10c8ef7a12f47b1",
+    "status": "1 of 2 attestations (verifier B); waiting on the app verifier via a signed-in Anchor request"
   }
 }
