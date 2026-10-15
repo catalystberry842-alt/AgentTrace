@@ -378,6 +378,35 @@ try {
   assert.equal(after[0].execution_nonce, "1");
   assert.equal(String(after[0].actions), "1");
   assert.equal(after[0].spent_in_period, "0");
+
+  // A second firewall contract (e.g. V3) indexed side by side: its ids are namespaced, so its
+  // firewall #1 does not overwrite the primary contract's firewall #1.
+  const second = `0x${"5e".repeat(20)}`;
+  process.env.AGENT_FIREWALL_EXTRA_SOURCES = `v3:${second}:1`;
+  const tx2 = `0x${"ef".repeat(32)}`;
+  let i2 = 0;
+  for (const log of created.execResult.logs ?? []) {
+    await indexer.applyFirewallLog(sql, second, {
+      address: second,
+      topics: log[1].map((topic) => bytesToHex(topic)),
+      data: bytesToHex(log[2]),
+      blockNumber: 30n,
+      logIndex: i2++,
+      transactionHash: tx2,
+    }, "v3");
+  }
+  const both = await sql`select firewall_id, agent_id from indexed_firewalls where firewall_id in ('1', 'v3-1') order by firewall_id`;
+  assert.deepEqual(both.map((r) => r.firewall_id), ["1", "v3-1"]);
+  assert.equal(both[1].agent_id, "1");
+  const primaryAfter = await sql`select execution_nonce from indexed_firewalls where firewall_id = '1'`;
+  assert.equal(primaryAfter[0].execution_nonce, "1", "primary history untouched");
+  assert.equal(indexer.contractForFirewallRef("v3-1"), second);
+  assert.equal(indexer.contractForFirewallRef("1"), indexer.configuredFirewall());
+  assert.equal(indexer.contractForFirewallRef("zz-1"), null);
+  assert.equal(indexer.onchainFirewallId("v3-1"), "1");
+  // A log from the second contract applied as the primary is ignored (address mismatch).
+  assert.equal(await indexer.applyFirewallLog(sql, firewallAddress, { address: second, topics: [], data: "0x", blockNumber: 1n, logIndex: 0, transactionHash: tx2 }), false);
+  delete process.env.AGENT_FIREWALL_EXTRA_SOURCES;
 } finally {
   await vite.close();
 }

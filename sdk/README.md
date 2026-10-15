@@ -42,6 +42,8 @@ console.log(result.proofStatus, result.proofUrl, result.anchorTxHash);
 
 Errors are `AgentTraceError` with a `code`:
 
+**Which firewall contract.** By default `traceCall` uses the network's V1 `AgentFirewall` (unchanged). Pass `firewallVersion: "v3"` for the recorded `AgentFirewallV3` (mainnet only today), or `firewallAddress` for any deployment, e.g. a newly deployed V3. `resolveFirewallAddress(network, opts)` returns the address that will be used. Proofs for a non-primary contract need the AgentTrace app to index it (`AGENT_FIREWALL_EXTRA_SOURCES`).
+
 | Code | Meaning | Sent? |
 | --- | --- | --- |
 | `POLICY_REJECTED` | An off-chain `limits` rule was broken | No |

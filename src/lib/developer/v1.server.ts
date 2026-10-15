@@ -1,3 +1,4 @@
+import { isFirewallRef } from "@/lib/chain/firewall-sources";
 import { getSql } from "@/lib/db";
 import { CAPABILITIES } from "@/lib/agents/types";
 import { parseCreateInput } from "@/lib/agents/validate";
@@ -153,7 +154,7 @@ export async function patchAgent(agentId: string): Promise<Response> {
 }
 
 export async function getFirewall(firewallId: string): Promise<Response> {
-  if (!/^[1-9]\d*$/.test(firewallId)) return apiError(404, "FIREWALL_NOT_FOUND", "Firewall not found.");
+  if (!isFirewallRef(firewallId)) return apiError(404, "FIREWALL_NOT_FOUND", "Firewall not found.");
   await syncFirewallSafe();
   const firewall = await getIndexedFirewall(firewallId);
   if (!firewall) return apiError(404, "FIREWALL_NOT_FOUND", "Firewall not found.");
@@ -275,7 +276,7 @@ export async function postFirewallAllow(firewallId: string, kind: "target" | "fu
       409,
     );
   }
-  if (!/^[1-9]\d*$/.test(firewallId)) return apiError(404, "FIREWALL_NOT_FOUND", "Firewall not found.");
+  if (!isFirewallRef(firewallId)) return apiError(404, "FIREWALL_NOT_FOUND", "Firewall not found.");
   const firewall = await getIndexedFirewall(firewallId);
   if (!firewall) return apiError(404, "FIREWALL_NOT_FOUND", "Firewall not found.");
   return apiJson(
@@ -298,7 +299,7 @@ export async function postFirewallAllow(firewallId: string, kind: "target" | "fu
 export async function postExecute(firewallId: string, request: Request): Promise<Response> {
   const body = await readBody(request);
   if (!body.ok) return body.response;
-  if (!/^[1-9]\d*$/.test(firewallId)) {
+  if (!isFirewallRef(firewallId)) {
     return refused("FIREWALL_NOT_FOUND", "Firewall not found.", 404);
   }
   const firewall = await getIndexedFirewall(firewallId);

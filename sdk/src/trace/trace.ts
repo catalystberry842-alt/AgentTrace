@@ -27,6 +27,8 @@ export const TRACE_NETWORKS = {
     explorer: "https://testnet.monadvision.com",
     appUrl: "https://agenttrace-plum.vercel.app",
     firewall: "0x694178a2396b54bff6a25caa0aa9cca6eb079441" as Address,
+    /** AgentFirewallV3 (per-agent vaults). None deployed on testnet yet: pass firewallAddress. */
+    firewallV3: null as Address | null,
   },
   "monad-mainnet": {
     chainId: 143,
@@ -34,10 +36,35 @@ export const TRACE_NETWORKS = {
     explorer: "https://monadvision.com",
     appUrl: "https://agenttrace-mainnet.vercel.app",
     firewall: "0x694178a2396b54bff6a25caa0aa9cca6eb079441" as Address,
+    /** AgentFirewallV3 live on mainnet (pre-audit build). A redeploy is passed via firewallAddress. */
+    firewallV3: "0x06f7ba5b998e3b33ed8df7a936eac82ea95be50f" as Address | null,
   },
 } as const;
 
 export type TraceNetwork = keyof typeof TRACE_NETWORKS;
+export type FirewallVersion = "v1" | "v3";
+
+/**
+ * Which AgentFirewall contract a call goes through. `firewallAddress` wins; otherwise
+ * `firewallVersion` picks the network's V1 (default, unchanged) or V3 deployment. execute() has the
+ * same signature and AgentAction the same shape on every version, so only the address differs.
+ */
+export function resolveFirewallAddress(
+  network: TraceNetwork,
+  opts: { firewallVersion?: FirewallVersion; firewallAddress?: Address } = {},
+): Address {
+  const net = TRACE_NETWORKS[network];
+  if (!net) throw new AgentTraceError("BAD_NETWORK", `Unknown network ${network}`, 400);
+  if (opts.firewallAddress) {
+    if (!/^0x[a-fA-F0-9]{40}$/.test(opts.firewallAddress)) throw new AgentTraceError("INVALID_INPUT", "firewallAddress must be an address", 400);
+    return opts.firewallAddress.toLowerCase() as Address;
+  }
+  if ((opts.firewallVersion ?? "v1") === "v3") {
+    if (!net.firewallV3) throw new AgentTraceError("INVALID_INPUT", `No AgentFirewallV3 is recorded for ${network}; pass firewallAddress`, 400);
+    return net.firewallV3;
+  }
+  return net.firewall;
+}
 
 const firewallAbi = parseAbi([
   "function execute(uint256 firewallId, address target, uint256 value, bytes data) payable",
@@ -63,6 +90,9 @@ const firewallAbi = parseAbi([
   "error AttachedValueMismatch(uint256 attached, uint256 declared)",
   "error ArgumentTooHigh(uint256 firewallId, bytes4 selector, uint8 argIndex, uint256 value, uint256 maxValue)",
   "error ArgumentMissing(uint256 firewallId, bytes4 selector, uint8 argIndex)",
+  "error ExecutorExpired(uint256 firewallId, uint64 validUntil)",
+  "error ArgumentPeriodLimitExceeded(uint256 firewallId, bytes4 selector, uint256 value, uint256 maxPerPeriod)",
+  "error RecipientNotAllowed(uint256 firewallId, bytes4 selector, address recipient)",
   "event AgentAction(uint256 indexed agentId, uint256 indexed firewallId, address indexed executor, address target, bytes4 functionSelector, uint256 value, uint256 executionNonce, bytes32 executionId, bytes32 calldataHash, uint64 timestamp)",
 ]);
 
@@ -87,6 +117,10 @@ export type TraceCallInput = {
    * throws POLICY_REJECTED and sends nothing. See AmountLimit for what this does and does not protect.
    */
   limits?: readonly AmountLimit[];
+  /** "v1" (default) or "v3". Ignored when firewallAddress is set. */
+  firewallVersion?: FirewallVersion;
+  /** Explicit AgentFirewall address, e.g. a newly deployed V3. */
+  firewallAddress?: Address;
 };
 
 export type TraceCallResult = {
@@ -112,6 +146,7 @@ export async function traceCall(input: TraceCallInput): Promise<TraceCallResult>
   const net = TRACE_NETWORKS[input.network];
   if (!net) throw new AgentTraceError("BAD_NETWORK", `Unknown network ${String(input.network)}.`, 400);
   enforceLimits(input.limits, input.target, input.data);
+  const firewall = resolveFirewallAddress(input.network, input);
   const account = typeof input.signer === "string" ? privateKeyToAccount(input.signer) : input.signer;
   const chain = defineChain({
     id: net.chainId,
@@ -128,7 +163,7 @@ export async function traceCall(input: TraceCallInput): Promise<TraceCallResult>
   try {
     ({ request } = await pub.simulateContract({
       account,
-      address: net.firewall,
+      address: firewall,
       abi: firewallAbi,
       functionName: "execute",
       args,
@@ -155,7 +190,7 @@ export async function traceCall(input: TraceCallInput): Promise<TraceCallResult>
   let executionId: Hex | undefined;
   let agentId = 0n;
   for (const log of receipt.logs) {
-    if (log.address.toLowerCase() !== net.firewall.toLowerCase()) continue;
+    if (log.address.toLowerCase() !== firewall.toLowerCase()) continue;
     try {
       const event = decodeEventLog({ abi: firewallAbi, data: log.data, topics: log.topics });
       if (event.eventName === "AgentAction") {

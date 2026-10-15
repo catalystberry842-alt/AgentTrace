@@ -582,6 +582,10 @@ From the live mainnet app, captured with `node scripts/readme-screenshots.mjs`:
 - [Trust upgrades](docs/trust-upgrades.md) · [Architecture](docs/architecture.md) · [Contracts](docs/contracts.md) · [API](docs/api.md) · [SDK](docs/sdk.md) · [Security](docs/security.md)
 - [Submission notes](docs/submission.md) · [Demo script](docs/demo-script.md) · [Demo voiceover](docs/demo-voiceover.md) · [MCP mainnet run](docs/agent-runs/mcp-mainnet.md) · [WMON mainnet run](docs/agent-runs/wmon-mainnet.md)
 
+## AI assistance
+
+AI coding assistants were used in building AgentTrace, including code, documentation, the security audit and its fixes. The author directed the work and reviewed the changes before they were merged.
+
 ## License
 
 MIT. See [LICENSE](LICENSE). The SDK uses the same license.

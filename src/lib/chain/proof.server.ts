@@ -5,13 +5,14 @@ import { getSql, type Sql } from "@/lib/db";
 import { agentProofAbi, agentRegistryAbi } from "@/lib/chain/abi";
 import { deployment } from "@/lib/chain/active-deployment";
 import { readAddress } from "@/lib/chain/addresses.server";
-import { configuredFirewall } from "@/lib/chain/firewall.server";
+import { configuredFirewall, contractForFirewallRef, onchainFirewallId } from "@/lib/chain/firewall.server";
 import { configuredRegistry, getPublicClient } from "@/lib/chain/indexer.server";
 import { MONAD_TESTNET } from "@/lib/chain/network";
 import { monadRpcUrl, monadTransport } from "@/lib/chain/rpc.server";
 import { cacheKey, cachedContractLogs, recordScan } from "@/lib/chain/chain-cache.server";
 import { assessExecution, VERIFICATION_METHOD, type AssessedLog } from "@/lib/chain/proof-assess";
 import { computeProofHash } from "@/lib/chain/proof-hash";
+import { quorumAddress, quorumDeployBlock, readContracts, writeTarget } from "@/lib/chain/proof-contracts";
 import { publishDeveloperEvent } from "@/lib/developer/webhooks.server";
 import type { ProofRecord, ProofStatus, VerificationCheck } from "@/lib/agents/types";
 
@@ -47,6 +48,30 @@ export function monadChain() {
 
 export function configuredProofAnchor(): `0x${string}` | null {
   return readAddress(deployment.agentProof, "MONAD_TESTNET_AGENT_PROOF", "AGENT_PROOF_ADDRESS");
+}
+
+/**
+ * Optional AgentProofQuorum (2-of-2 or m-of-n). When AGENT_PROOF_QUORUM_ADDRESS is set, this
+ * server's verifier attests there instead of writing to the single-verifier AgentProof; the
+ * proof is anchored once the other verifiers attest the same hash. AgentProof stays readable,
+ * so existing anchors keep showing. Unset (default) = current single-verifier behaviour.
+ */
+export function configuredProofQuorum(): `0x${string}` | null {
+  return quorumAddress(process.env);
+}
+
+export function configuredProofQuorumDeployBlock(): number | null {
+  return quorumDeployBlock(process.env);
+}
+
+/** Where new anchors are written: the quorum when configured, else AgentProof. */
+export function proofWriteTarget(): `0x${string}` | null {
+  return writeTarget(configuredProofAnchor(), process.env);
+}
+
+/** Every contract whose ExecutionProofAnchored events count as an anchor (legacy first). */
+export function proofReadContracts(): `0x${string}`[] {
+  return readContracts(configuredProofAnchor(), process.env);
 }
 
 export function configuredProofDeployBlock(): number | null {
@@ -345,7 +370,7 @@ async function verifyExecutionOnce(executionId: string, force = false): Promise<
       action: {
         executionId: action.execution_id,
         agentId: action.agent_id,
-        firewallId: action.firewall_id,
+        firewallId: onchainFirewallId(action.firewall_id),
         executor: action.executor,
         target: action.target,
         selector: action.selector,
@@ -356,7 +381,7 @@ async function verifyExecutionOnce(executionId: string, force = false): Promise<
       },
       agentExists: await agentExistsOnChain(action.agent_id, action.agent_exists),
       firewallAgentId: action.firewall_agent_id,
-      firewallContract: firewall,
+      firewallContract: contractForFirewallRef(action.firewall_id) ?? firewall,
       tx: tx
         ? { hash: tx.hash, from: tx.from, to: tx.to, input: tx.input, value: tx.value }
         : null,
@@ -485,7 +510,7 @@ function recomputedHash(proof: ProofRecord): `0x${string}` | null {
     return computeProofHash({
       chainId: BigInt(MONAD_TESTNET.chainId),
       agentId: BigInt(proof.agentId),
-      firewallId: BigInt(proof.firewallId),
+      firewallId: BigInt(onchainFirewallId(proof.firewallId)),
       executionId: proof.executionId as `0x${string}`,
       executor: proof.executor as `0x${string}`,
       transactionHash: proof.txHash as `0x${string}`,
@@ -538,7 +563,7 @@ async function receiptStillMatches(proof: ProofRecord): Promise<string | null> {
       action: {
         executionId: action.execution_id,
         agentId: action.agent_id,
-        firewallId: action.firewall_id,
+        firewallId: onchainFirewallId(action.firewall_id),
         executor: action.executor,
         target: action.target,
         selector: action.selector,
@@ -549,7 +574,7 @@ async function receiptStillMatches(proof: ProofRecord): Promise<string | null> {
       },
       agentExists: await agentExistsOnChain(action.agent_id, action.agent_exists),
       firewallAgentId: action.firewall_agent_id,
-      firewallContract: firewall,
+      firewallContract: contractForFirewallRef(action.firewall_id) ?? firewall,
       tx: { hash: tx.hash, from: tx.from, to: tx.to, input: tx.input, value: tx.value },
       receipt: {
         status: receipt.status,
@@ -573,10 +598,11 @@ async function receiptStillMatches(proof: ProofRecord): Promise<string | null> {
   }
 }
 
-function proofCacheKey(): string | null {
-  const contract = configuredProofAnchor();
-  const block = configuredProofDeployBlock();
-  return contract && block != null ? cacheKey(contract, block) : null;
+function proofCacheKey(contract: string | null = configuredProofAnchor()): string | null {
+  if (!contract) return null;
+  const quorum = configuredProofQuorum();
+  const block = quorum && contract.toLowerCase() === quorum ? configuredProofQuorumDeployBlock() : configuredProofDeployBlock();
+  return block != null ? cacheKey(contract, block) : null;
 }
 
 const anchorChecks: Map<string, number> =
@@ -588,13 +614,21 @@ const anchorChecks: Map<string, number> =
  * (which proves the anchor but not which transaction wrote it). Returns true when it is anchored.
  */
 async function restoreAnchor(proof: ProofRecord, force = false): Promise<boolean> {
-  const contract = configuredProofAnchor();
-  if (!contract || !proof.proofHash) return false;
+  const contracts = proofReadContracts();
+  if (!contracts.length || !proof.proofHash) return false;
   const id = proof.executionId.toLowerCase();
   const last = anchorChecks.get(id) ?? 0;
   if (!force && Date.now() - last < 60_000) return false;
   anchorChecks.set(id, Date.now());
-  const key = proofCacheKey();
+  for (const contract of contracts) {
+    if (await restoreAnchorFrom(contract, proof, id)) return true;
+  }
+  return false;
+}
+
+async function restoreAnchorFrom(contract: `0x${string}`, proof: ProofRecord, id: string): Promise<boolean> {
+  if (!proof.proofHash) return false;
+  const key = proofCacheKey(contract);
   if (key) {
     for (const log of await cachedContractLogs(key)) {
       if (log.topics.some((t) => t?.toLowerCase() === id)) await applyProofLog(log);
@@ -658,7 +692,7 @@ export async function anchorVerifiedProof(
   if (!again || again !== proof.proofHash.toLowerCase()) {
     return { anchored: false, reason: "Stored proof hash does not match the execution record.", txHash: null, proof };
   }
-  const contract = configuredProofAnchor();
+  const contract = proofWriteTarget();
   const key = verifierKey();
   if (!contract || !key) {
     return {
@@ -692,7 +726,7 @@ export async function anchorVerifiedProof(
         proof.proofHash as Hex,
         proof.executionId as Hex,
         BigInt(proof.agentId),
-        BigInt(proof.firewallId),
+        BigInt(onchainFirewallId(proof.firewallId)),
         proof.txHash as Hex,
       ],
     });
@@ -701,7 +735,7 @@ export async function anchorVerifiedProof(
       return { anchored: false, reason: "The anchor transaction reverted. The proof was not anchored.", txHash: hash, proof };
     }
     for (const log of receipt.logs) await applyProofLog(log);
-    const key = proofCacheKey();
+    const key = proofCacheKey(contract);
     if (key) {
       const own = receipt.logs.filter((l) => l.address.toLowerCase() === contract.toLowerCase());
       await recordScan(key, own as Log[], Number(receipt.blockNumber));
@@ -757,8 +791,7 @@ function quorumAttestation(logs: readonly { address: string; topics: Hex[]; data
 }
 
 export async function applyProofLog(log: { address?: string; topics: Hex[]; data: Hex; blockNumber?: bigint | null; transactionHash?: Hex | null }): Promise<void> {
-  const contract = configuredProofAnchor();
-  if (!contract || !log.address || log.address.toLowerCase() !== contract) return;
+  if (!log.address || !proofReadContracts().includes(log.address.toLowerCase() as `0x${string}`)) return;
   if (log.topics.length === 0) return;
   let decoded: { eventName: string; args: Record<string, unknown> };
   try {

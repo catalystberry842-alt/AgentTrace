@@ -5,6 +5,9 @@
 // nothing), then sent from the agent's executor key, then verified and anchored by AgentTrace.
 //
 // Env: AGENT_KEY (the firewall executor), FIREWALL_ID, AGENT_ID,
+//      FIREWALL_VERSION=v1 | v3 (default v1), FIREWALL_ADDRESS (optional, overrides the version),
+//      FIREWALL_REF (optional): the app's id for this firewall when it is not on the primary
+//        contract, e.g. "v3-1" (see AGENT_FIREWALL_EXTRA_SOURCES on the app). Default FIREWALL_ID.
 //      NETWORK=monad-mainnet | monad-testnet (default testnet), AGENTTRACE_URL (optional),
 //      AGENT_LIMITS (optional) JSON array of off-chain amount caps checked before anything is sent:
 //        [{"selector":"0xe2bbb158","argIndex":1,"maxAmount":"500"}]   (deposit amount <= 500)
@@ -13,7 +16,7 @@
 // Transport: MCP over stdio, newline-delimited JSON-RPC 2.0. No dependencies beyond viem.
 import { createInterface } from "node:readline";
 import { encodeFunctionData, isAddress, isHex, parseAbi, toFunctionSelector, type Address, type Hex } from "viem";
-import { TRACE_NETWORKS, traceCall, enforceLimits, validateLimits, type AmountLimit, type TraceNetwork } from "../../sdk/src/index.ts";
+import { TRACE_NETWORKS, traceCall, resolveFirewallAddress, enforceLimits, validateLimits, type AmountLimit, type TraceNetwork } from "../../sdk/src/index.ts";
 
 const network = (process.env.NETWORK ?? "monad-testnet") as TraceNetwork;
 const net = TRACE_NETWORKS[network];
@@ -22,6 +25,12 @@ const appUrl = (process.env.AGENTTRACE_URL ?? net.appUrl).replace(/\/$/, "");
 const firewallId = BigInt(process.env.FIREWALL_ID ?? "0");
 const agentId = BigInt(process.env.AGENT_ID ?? "0");
 const key = process.env.AGENT_KEY as `0x${string}` | undefined;
+const firewallVersion = (process.env.FIREWALL_VERSION?.trim().toLowerCase() || "v1") as "v1" | "v3";
+if (firewallVersion !== "v1" && firewallVersion !== "v3") throw new Error("FIREWALL_VERSION must be v1 or v3");
+const firewallAddress = (process.env.FIREWALL_ADDRESS?.trim() || undefined) as Address | undefined;
+// Fails fast at startup on a bad address or a network without a recorded V3.
+const firewallContract = resolveFirewallAddress(network, { firewallVersion, firewallAddress });
+const firewallRef = process.env.FIREWALL_REF?.trim() || String(firewallId);
 const DEMO = "0x1664be58ee54af91c756428f466bad6e4f9911c3" as const;
 
 function parseLimits(raw: string | undefined): AmountLimit[] {
@@ -83,7 +92,7 @@ async function guarded(target: `0x${string}`, data: `0x${string}`, value = 0n) {
   }
   if (!key) return text("AGENT_KEY is not set, so this server cannot sign.", true);
   try {
-    const result = await traceCall({ network, signer: key, firewallId, target, data, value, appUrl, limits });
+    const result = await traceCall({ network, signer: key, firewallId, target, data, value, appUrl, limits, firewallAddress: firewallContract });
     return text({ allowed: true, ...result });
   } catch (error) {
     const code = (error as { code?: string }).code ?? "ERROR";
@@ -96,7 +105,7 @@ async function callTool(name: string, args: Record<string, unknown>) {
     // A cold app instance may still be catching up on the chain; give it a few tries.
     let response: Response | null = null;
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      response = await fetch(`${appUrl}/api/firewalls/${firewallId}`).catch(() => null);
+      response = await fetch(`${appUrl}/api/firewalls/${encodeURIComponent(firewallRef)}`).catch(() => null);
       if (response?.ok) break;
       await new Promise((resolve) => setTimeout(resolve, 3_000));
     }
@@ -104,6 +113,7 @@ async function callTool(name: string, args: Record<string, unknown>) {
     const { firewall } = (await response.json()) as { firewall: Record<string, any> };
     return text({
       firewallId: firewall.id,
+      firewallContract,
       agentId: firewall.agentId,
       status: firewall.status,
       executor: firewall.executor,
