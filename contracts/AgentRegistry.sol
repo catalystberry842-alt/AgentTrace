@@ -5,7 +5,9 @@ pragma solidity 0.8.31;
 /// @notice Persistent identities for AI agents. IDs start at 1 and are never reused or deleted.
 /// @dev Capability bits: Trading 1<<0, Yield 1<<1, DeFi 1<<2, Payments 1<<3,
 ///      Research 1<<4, Data 1<<5, Social 1<<6, Gaming 1<<7, Other 1<<8.
-///      Ownership is msg.sender. There is no admin and the contract is not upgradeable.
+///      Ownership is msg.sender and cannot be transferred: there is no transfer function.
+///      Deactivation is permanent (no reactivate). There is no admin and the contract is not
+///      upgradeable.
 contract AgentRegistry {
     uint256 internal constant CAPABILITY_MASK = (uint256(1) << 9) - 1;
 

@@ -4,8 +4,10 @@ pragma solidity 0.8.31;
 /// @title AgentProof
 /// @notice Immutable anchors for execution proofs that an off-chain verifier already checked.
 /// @dev This contract cannot read historical receipts. It stores a proof hash the verifier
-///      computed as keccak256(abi.encode(agentId, firewallId, executionId, executor,
-///      transactionHash, blockNumber, target, selector, value, calldataHash)).
+///      computed as keccak256(abi.encode(chainId, agentId, firewallId, executionId, executor,
+///      transactionHash, blockNumber, target, selector, value, calldataHash)) (see
+///      scripts/verify-proof.mjs). The owner can replace the single verifier immediately; use
+///      AgentProofQuorum when that trust assumption is not acceptable.
 ///      Anchors cannot be edited. A wrong proof is a new verification off-chain, not a rewrite.
 contract AgentProof {
     struct Anchor {
@@ -25,6 +27,7 @@ contract AgentProof {
     mapping(bytes32 proofHash => bytes32 executionId) private _byHash;
 
     error ZeroAddress();
+    error ZeroValue();
     error Unauthorized(address caller);
     error ProofAlreadyAnchored(bytes32 executionId);
     error ProofHashAlreadyUsed(bytes32 proofHash);
@@ -64,7 +67,7 @@ contract AgentProof {
     ) external {
         if (msg.sender != verifier) revert Unauthorized(msg.sender);
         if (proofHash == bytes32(0) || executionId == bytes32(0) || transactionHash == bytes32(0)) {
-            revert ZeroAddress();
+            revert ZeroValue();
         }
         if (_anchors[executionId].anchoredAt != 0) revert ProofAlreadyAnchored(executionId);
         if (_byHash[proofHash] != bytes32(0)) revert ProofHashAlreadyUsed(proofHash);

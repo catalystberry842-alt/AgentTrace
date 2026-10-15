@@ -186,7 +186,7 @@ assert.equal(
 );
 assert.equal(
   reverted(await call(carol, proof, proofAbi, "anchorProof", ["0x" + "00".repeat(32), executionA, 1n, 1n, txA]), proofAbi),
-  "ZeroAddress",
+  "ZeroValue",
 );
 const anchored = await call(carol, proof, proofAbi, "anchorProof", [proofHash, executionA, 1n, 1n, txA]);
 assert.equal(anchored.execResult.exceptionError, undefined);

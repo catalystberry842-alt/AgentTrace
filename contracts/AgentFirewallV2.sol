@@ -2,6 +2,9 @@
 pragma solidity 0.8.31;
 
 /// @title AgentFirewallV2
+/// @custom:deprecated Use AgentFirewallV3. Targets see this contract as msg.sender, so every
+///      agent on one deployment shares a single token balance: an agent allowed to call a token's
+///      transfer/approve can move assets other agents' calls left here. Do not hold assets here.
 /// @notice V2 adds per-selector argument caps (setArgCap): a static uint256 argument of an
 ///         allowed function can be bounded, e.g. the amount of deposit(uint256,uint256).
 ///         Everything else, including the AgentAction event and executionId, is identical to V1.
@@ -280,7 +283,9 @@ contract AgentFirewallV2 {
 
     function allowTarget(uint256 firewallId, address target, string calldata name) external {
         Firewall storage fw = _owned(firewallId);
-        if (target == address(0) || bytes(name).length > 64) revert InvalidTarget();
+        // The firewall itself is never a target: calls run as the firewall, which holds one
+        // balance shared by every agent on this deployment.
+        if (target == address(0) || target == address(this) || bytes(name).length > 64) revert InvalidTarget();
         TargetInfo storage info = _targets[firewallId][target];
         info.name = name;
         info.active = true;
