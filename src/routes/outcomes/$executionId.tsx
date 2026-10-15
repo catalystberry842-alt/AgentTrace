@@ -7,7 +7,29 @@ import { Shell } from "@/components/shell";
 import { ErrorNote, Fact, NotFoundState, OutcomeSkeleton, Status, buttonClass } from "@/components/ui";
 import { formatAgentLabel } from "@/lib/format";
 
-export const Route = createFileRoute("/outcomes/$executionId")({ component: OutcomePage });
+export const Route = createFileRoute("/outcomes/$executionId")({
+  component: OutcomePage,
+  server: {
+    handlers: {
+      // ERC-8004 feedbackURI points here. Non-HTML clients (verifiers) get the exact JSON
+      // preimage whose keccak256 is the onchain feedbackHash; browsers get the page.
+      GET: async ({ request, params, next }) => {
+        const { wantsFeedbackJson, outcomeFeedbackJson } = await import("@/lib/chain/outcome-feedback");
+        if (!wantsFeedbackJson(request)) return next();
+        const { getOutcomeByExecution } = await import("@/lib/chain/reputation.server");
+        const outcome = await getOutcomeByExecution(params.executionId).catch(() => null);
+        const headers = { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*", vary: "Accept" };
+        if (!outcome || (outcome.status !== "verified" && outcome.status !== "failed")) {
+          return new Response(JSON.stringify({ error: "OUTCOME_NOT_FOUND" }), { status: 404, headers });
+        }
+        return new Response(outcomeFeedbackJson(params.executionId, outcome), {
+          status: 200,
+          headers: { ...headers, "cache-control": "public, max-age=60" },
+        });
+      },
+    },
+  },
+});
 
 function label(status: OutcomeRecord["status"]): string {
   if (status === "verified") return "Verified";
