@@ -1,3 +1,4 @@
+import { outcomeFeedbackJson } from "./outcome-feedback";
 import { createPublicClient, createWalletClient, decodeEventLog, keccak256, toBytes, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
@@ -225,7 +226,7 @@ export async function publishExecution(executionId: string): Promise<PublishResu
     if (existing && existing[0].length > 0) {
       out.feedback = { state: "posted", txHash: txs[`feedback:${executionId}`] ?? null, value: Number(existing[2][0]) };
     } else {
-      const feedbackHash = keccak256(toBytes(JSON.stringify({ executionId, status: outcome.status, observed: outcome.observed, evidence: outcome.evidence })));
+      const feedbackHash = keccak256(toBytes(outcomeFeedbackJson(executionId, outcome)));
       const hash = await wallet.writeContract({
         address: erc8004.reputation,
         abi: reputationRegistryAbi,
