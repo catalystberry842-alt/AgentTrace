@@ -74,7 +74,7 @@ function WebhookManager() {
             .finally(() => setPending(false));
         }}
       >
-        <Field label="URL" hint="https, or http on localhost">
+        <Field label="URL" hint="Public https URL (http on localhost in development)">
           <TextInput value={url} onChange={(event) => setUrl(event.target.value)} required inputMode="url" />
         </Field>
         <div className="flex flex-col" role="group" aria-label="Events">

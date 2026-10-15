@@ -565,6 +565,8 @@ async function ensureExecutionIndexed(id: string, txHash: `0x${string}` | null) 
 export const verifyProof = createServerFn({ method: "POST" })
   .validator(parseExecutionRef)
   .handler(async ({ data }) => {
+    const { enforceRateLimit } = await import("@/lib/rate-limit.server");
+    enforceRateLimit("verifyProof", 30);
     await ensureExecutionIndexed(data.id, data.txHash);
     const proof = await verifyIndexedExecution(data.id, true);
     if (!proof) throw new Error("No AgentAction is indexed for this execution. A transaction hash is not a proof.");
@@ -912,6 +914,9 @@ export const linkErc8004 = createServerFn({ method: "POST" })
     return { agentId: input.agentId, txHash: txHash as `0x${string}` | undefined, erc8004Id };
   })
   .handler(async ({ data }) => {
+    // No sign-in needed: the link is proven onchain (same owner + agenttrace metadata).
+    const { enforceRateLimit } = await import("@/lib/rate-limit.server");
+    enforceRateLimit("linkErc8004", 10);
     await syncRegistrySafe();
     const { linkFromRegistration, linkExisting } = await import("@/lib/chain/erc8004.server");
     return data.txHash ? linkFromRegistration(data.agentId, data.txHash) : linkExisting(data.agentId, data.erc8004Id!);
@@ -919,8 +924,12 @@ export const linkErc8004 = createServerFn({ method: "POST" })
 
 /** Post the AgentTrace validation response and outcome feedback for one execution, if due. */
 export const publishErc8004 = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .validator(parseExecutionRef)
   .handler(async ({ data }) => {
+    // Signed-in only: this spends the verifier wallet's gas.
+    const { enforceRateLimit } = await import("@/lib/rate-limit.server");
+    enforceRateLimit("publishErc8004", 10);
     await ensureExecutionIndexed(data.id, data.txHash);
     await verifyIndexedExecution(data.id, true);
     const { publishExecution } = await import("@/lib/chain/erc8004.server");

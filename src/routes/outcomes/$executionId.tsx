@@ -14,15 +14,13 @@ export const Route = createFileRoute("/outcomes/$executionId")({
       // ERC-8004 feedbackURI points here. Non-HTML clients (verifiers) get the exact JSON
       // preimage whose keccak256 is the onchain feedbackHash; browsers get the page.
       GET: async ({ request, params, next }) => {
-        const { wantsFeedbackJson, outcomeFeedbackJson } = await import("@/lib/chain/outcome-feedback");
+        const { wantsFeedbackJson } = await import("@/lib/chain/outcome-feedback");
         if (!wantsFeedbackJson(request)) return next();
-        const { getOutcomeByExecution } = await import("@/lib/chain/reputation.server");
-        const outcome = await getOutcomeByExecution(params.executionId).catch(() => null);
+        const { feedbackDocument } = await import("@/lib/chain/erc8004.server");
+        const doc = await feedbackDocument(params.executionId).catch(() => null);
         const headers = { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*", vary: "Accept" };
-        if (!outcome || (outcome.status !== "verified" && outcome.status !== "failed")) {
-          return new Response(JSON.stringify({ error: "OUTCOME_NOT_FOUND" }), { status: 404, headers });
-        }
-        return new Response(outcomeFeedbackJson(params.executionId, outcome), {
+        if (!doc) return new Response(JSON.stringify({ error: "OUTCOME_NOT_FOUND" }), { status: 404, headers });
+        return new Response(doc, {
           status: 200,
           headers: { ...headers, "cache-control": "public, max-age=60" },
         });

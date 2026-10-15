@@ -275,6 +275,11 @@ function Landing({ pending }: { pending: boolean }) {
           </a>
           , so a call above it reverts in the contract, not in this app.
         </p>
+        <p className="mt-2 max-w-2xl text-sm text-pretty text-muted">
+          <span className="font-medium text-fg">Deprecated for holding assets:</span> V1 and V2 firewalls call targets as one
+          shared contract, so tokens left there are not separated per agent. New agents should use AgentFirewallV3, where
+          each agent gets its own vault.
+        </p>
         <ul className="mt-4 divide-y divide-border border-y border-border text-sm">
           {[
             { tone: "text-ok", mark: "Allowed", row: ARGCAP.allowed },

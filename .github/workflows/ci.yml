@@ -20,8 +20,10 @@ jobs:
       - run: npm test
       - name: Contract artifacts match sources
         run: |
+          node scripts/compile-registry.mjs
+          npm run compile:v2
           npm run compile:v3
-          git diff --exit-code contracts/out/AgentFirewallV3.json contracts/out/AgentVault.json contracts/out/AgentProofQuorum.json
+          git diff --exit-code contracts/out src/lib/chain/abi.ts
       - run: npm run test:contracts
       - name: Build testnet app
         run: npm run build:app

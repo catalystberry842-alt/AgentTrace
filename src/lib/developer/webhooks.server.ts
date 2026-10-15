@@ -1,12 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { getSql } from "@/lib/db";
 import { WEBHOOK_EVENTS, type WebhookEvent } from "@/lib/developer/events";
-import { signPayload } from "../../../sdk/src/webhooks/verify.ts";
+import { signPayload, signPayloadWithTimestamp } from "../../../sdk/src/webhooks/verify.ts";
+import { assertDeliverable, parseWebhookUrl } from "@/lib/developer/webhook-url";
 
-export { WEBHOOK_EVENTS };
+export { WEBHOOK_EVENTS, parseWebhookUrl };
 export type { WebhookEvent };
-
-const BLOCKED_HOSTS = new Set(["169.254.169.254", "0.0.0.0", "metadata.google.internal"]);
 
 export type WebhookRecord = {
   id: string;
@@ -15,22 +14,6 @@ export type WebhookRecord = {
   createdAt: string | null;
   disabledAt: string | null;
 };
-
-export function parseWebhookUrl(value: string): string | null {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return null;
-  }
-  if (url.username || url.password) return null;
-  const host = url.hostname.toLowerCase();
-  if (BLOCKED_HOSTS.has(host)) return null;
-  const local = host === "localhost" || host === "127.0.0.1";
-  if (url.protocol === "https:") return url.toString();
-  if (url.protocol === "http:" && local) return url.toString();
-  return null;
-}
 
 export function parseWebhookEvents(value: unknown): WebhookEvent[] | null {
   if (!Array.isArray(value) || value.length === 0) return null;
@@ -118,15 +101,23 @@ async function deliver(
   const eventId = `evt_${randomBytes(12).toString("hex")}`;
   const payload = JSON.stringify({ id: eventId, type, createdAt: new Date().toISOString(), data });
   const signature = signPayload(hook.signing_secret, payload);
+  const timestamp = Math.floor(Date.now() / 1000);
   let responseStatus: number | null = null;
   let status: "delivered" | "failed" = "failed";
   try {
+    await assertDeliverable(hook.url);
     const response = await fetch(hook.url, {
       method: "POST",
+      // A redirect could point at an internal address; never follow one.
+      redirect: "manual",
       body: payload,
       headers: {
         "content-type": "application/json",
+        // Legacy body-only signature, kept so existing receivers keep working.
         "X-AgentTrace-Signature": signature,
+        // Replay-resistant: HMAC over `${timestamp}.${body}`; receivers should reject old timestamps.
+        "X-AgentTrace-Timestamp": String(timestamp),
+        "X-AgentTrace-Signature-V2": signPayloadWithTimestamp(hook.signing_secret, payload, timestamp),
         "X-AgentTrace-Event": type,
       },
       signal: AbortSignal.timeout(4000),
