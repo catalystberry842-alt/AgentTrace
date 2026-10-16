@@ -101,8 +101,9 @@ if (process.argv.includes("--smoke") && !rec.smoke) {
     .find((e) => e.eventName === "AgentRegistered").args.agentId;
   const sessionKey = generatePrivateKey();
   const session = privateKeyToAccount(sessionKey);
-  const gasPrice = await pub.getGasPrice();
-  const stipend = gasPrice * 400_000n;
+  // Monad bills the gas limit at maxFeePerGas; gasPrice alone left the session key short on testnet.
+  const { maxFeePerGas } = await pub.estimateFeesPerGas();
+  const stipend = maxFeePerGas * 400_000n;
   const setup = await send("createFirewallWithPermissions", {
     to: rec.agentFirewallV3,
     value: stipend,
