@@ -1,4 +1,5 @@
 import { outcomeFeedbackJson } from "./outcome-feedback";
+import { pinnedFeedbackDocument } from "./pinned-feedback-docs";
 import { createPublicClient, createWalletClient, decodeEventLog, keccak256, toBytes, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
@@ -46,6 +47,11 @@ const FEEDBACK_DOCS = "erc8004FeedbackDocs";
 export async function feedbackDocument(executionId: string): Promise<string | null> {
   const pinned = (await cachedKv(FEEDBACK_DOCS).catch(() => ({}) as Record<string, string>))[executionId.toLowerCase()];
   if (pinned) return pinned;
+  // Feedback posted before pinning existed has no stored document, and the database it would be rebuilt
+  // from is empty after a cold start. Those few documents are committed in the repo, each one verified
+  // against the hash in its posting transaction (see pinned-feedback-docs.ts).
+  const fromRepo = pinnedFeedbackDocument(executionId);
+  if (fromRepo) return fromRepo;
   const outcome = await getOutcomeByExecution(executionId).catch(() => null);
   if (!outcome || (outcome.status !== "verified" && outcome.status !== "failed")) return null;
   return outcomeFeedbackJson(executionId, outcome);
