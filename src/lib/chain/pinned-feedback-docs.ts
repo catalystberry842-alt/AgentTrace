@@ -38,6 +38,14 @@ export const PINNED_FEEDBACK_DOCS: readonly PinnedFeedbackDoc[] = [
     document:
       '{"executionId":"0x55b2e18ff7e0995159672f4624451510079632662086fa3a65d3896ecced1862","status":"verified","observed":"{\\"arg0\\":\\"0x694178a2396b54bFF6a25caa0aA9Cca6Eb079441\\",\\"arg1\\":\\"0xB925D44d52815D19C2f91c30f6aBD3B4D0546D4E\\",\\"arg2\\":\\"10000000000000000\\"}","evidence":"0x9ad6de14a8c4c19944b28dc0d676a20460a167cef5883dd3824f9cc1b26b99b1"}',
   },
+  {
+    // Mainnet agent 10280 (AgentTrace agent #001), feedback 1: demo protocol Deposited(agentId 1, amount 100).
+    executionId: "0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e",
+    feedbackHash: "0x76d54b9174ffda566e04424bb76ba8385915c567ecd13ae76cf0cffb5c6ed833",
+    postedIn: "0x3c05024ac5e0f78972734ee68cce1a4bb7126b375d3500a4e6be405f4a81aef6",
+    document:
+      '{"executionId":"0x52c98d5058fc9a180a5270aeea72698600f5c6c181d7723a1f503fcdab4c6d5e","status":"verified","observed":"{\\"agentId\\":\\"1\\",\\"amount\\":\\"100\\"}","evidence":"0x7db78e779216bc5d55dd1a957871122ed0d23357e0c5acda7ddbe6401fc4c0c8"}',
+  },
 ];
 
 /** The pinned document for an execution, or null. Case-insensitive on the execution id. */
